@@ -1491,7 +1491,7 @@ const VIEWS = {
       </div>`).join('')}
     <div class="fit" id="fit" data-stagger></div>
     <label class="switch" data-stagger><input type="checkbox" id="ghost-toggle" ${state.ghost ? 'checked' : ''}><span class="track"></span>Show my brush in the preview</label>
-    <label class="switch" data-stagger><input type="checkbox" id="exo-switch" ${state.showExo ? 'checked' : ''}><span class="track"></span>Show the exoskeleton</label>`,
+    <label class="switch" data-stagger><input type="checkbox" id="exo-switch" ${state.showExo ? 'checked' : ''}><span class="track"></span>Show the exoskeleton in the preview</label>`,
 
   design: () => `
     <h2 data-stagger>Choose a design</h2>
