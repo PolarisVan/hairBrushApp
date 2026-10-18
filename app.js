@@ -25,8 +25,9 @@ const CONFIG = {
     sideHookZ: 44.46,       // inner face of each side hook: half the head width
     sideLipZ: 39.38,        // beyond this |z| the side hooks keep their shape
     plateHalfWidth: 15,     // half-width of the back plate
-    cradleCenterY: 13.23,   // the C-cradle is a half circle around the handle: its centre height ...
-    cradleRadius: 10.16,    // ... and inner radius (half the handle width)
+    cradleCenterY: 13.23,   // the C-cradle as modelled is a half circle: its centre (= rim) height ...
+    cradleRadius: 10.16,    // ... and inner radius. It is reshaped into a channel that fits the flat handle.
+    cradleSquareness: 4,    // channel profile: 2 = round, higher = flatter bottom and squarer corners
     plateBottom: 4.42,      // underside of the back plate
     plateTop: 7.62,         // the head rests on this face ...
     lipBottom: 10.67,       // ... and the hook lips close over its edge here
@@ -54,13 +55,13 @@ const FINISHES = [
 ];
 const DESIGNS = [
   { id: 'paddle', name: 'Paddle', blurb: 'Wide, flat cushion for smoothing long hair.', price: 39,
-    dims: { length: 240, headLength: 110, headWidth: 84, handleWidth: 28, thickness: 12 } },
+    dims: { length: 240, headLength: 110, headWidth: 84, handleWidth: 28, handleThickness: 10, thickness: 12 } },
   { id: 'oval', name: 'Oval cushion', blurb: 'An everyday all-rounder with a softer footprint.', price: 36,
-    dims: { length: 220, headLength: 96, headWidth: 66, handleWidth: 26, thickness: 13 } },
+    dims: { length: 220, headLength: 96, headWidth: 66, handleWidth: 26, handleThickness: 11, thickness: 13 } },
   { id: 'round', name: 'Round thermal', blurb: 'Aluminium barrel for volume and blow-outs.', price: 42,
-    dims: { length: 250, headLength: 110, headWidth: 56, handleWidth: 24, thickness: 12 } },
+    dims: { length: 250, headLength: 110, headWidth: 56, handleWidth: 24, handleThickness: 24, thickness: 12 } },
   { id: 'slim', name: 'Slim detangler', blurb: 'Narrow and light, with staggered pins that glide through knots.', price: 34,
-    dims: { length: 215, headLength: 100, headWidth: 46, handleWidth: 22, thickness: 10 } },
+    dims: { length: 215, headLength: 100, headWidth: 46, handleWidth: 22, handleThickness: 8, thickness: 10 } },
 ];
 const SIZES = [
   { id: 's', name: 'Compact', note: '−12%', k: 0.88, price: 0 },
@@ -90,7 +91,8 @@ const DIM_FIELDS = [
   { key: 'headLength', label: 'Head length', min: 70, max: 180, hint: 'Tip of the head to where it meets the handle. Sets where the top hook and the cradle sit.' },
   { key: 'headWidth', label: 'Head width', min: 45, max: 120, hint: 'Widest point across the head. The side hooks clip on here.' },
   { key: 'thickness', label: 'Head edge thickness', min: 1, max: 15, hint: 'How thick the rim of the head is where the hook lips close over it.' },
-  { key: 'handleWidth', label: 'Handle width', min: 15, max: 40, hint: 'Across the handle just below the head, where the cradle cups it.' },
+  { key: 'handleWidth', label: 'Handle width', min: 15, max: 40, hint: 'Across the flat handle just below the head, where the cradle wraps around it.' },
+  { key: 'handleThickness', label: 'Handle thickness', min: 4, max: 25, hint: 'Back to front of the handle at the same spot. Sets how deep the cradle is.' },
   { key: 'length', label: 'Total length', min: 160, max: 320, hint: 'Only used for the preview: the exoskeleton covers the head, not the handle.' },
 ];
 const DESIGN_ART = {
@@ -107,6 +109,7 @@ const REF = {
   headLength: EXO.tipX - EXO.baseX,
   headWidth: 2 * EXO.sideHookZ,
   handleWidth: 2 * EXO.cradleRadius,
+  handleThickness: EXO.cradleRadius,
   thickness: EXO.lipBottom - EXO.plateTop,
 };
 const REF_START = Object.fromEntries(Object.entries(REF).map(([k, v]) => [k, Math.round(v)]));
@@ -557,19 +560,15 @@ class BrushModel {
     let Th = Math.max(5, T * 0.8), hy = Math.max(0, (T - Th) / 2); // a thin head mustn't push the handle below its back
     const neckX = Lh - 10;
     let neck;
-    if (this.handleAxisY != null) {
-      // Round handle (the user's own brush): full width by the time it reaches the cradle at x = Lh.
-      const R = Wd / 2, x0 = Lh - 12, len = L - x0, pts = [];
-      for (let i = 0; i <= 48; i++) {
-        const u = (i / 48) * len, x = x0 + u;
-        let r = R * lerp(0.4, 1, smoothstep(x0, Lh, x));
-        if (u > len - 6) r *= Math.sqrt(Math.max(0, 1 - ((u - (len - 6)) / 6) ** 2));
-        pts.push(new THREE.Vector2(Math.max(r, 0.01), u));
-      }
-      const handle = new THREE.LatheGeometry(pts, 40).rotateZ(-Math.PI / 2).translate(x0, this.handleAxisY, 0);
+    if (this.handleBottomY != null) {
+      // The user's own brush: a flat handle of the measured thickness, its back in the cradle channel.
+      Th = d.handleThickness;
+      hy = this.handleBottomY;
+      const hb = Math.min(2, Th / 4);
+      const hs = handleShape(neckX, L - hb, Wd, Wd);
+      const handle = slab(hs.shape, Th, hb);
+      handle.translate(0, hy, 0);
       this.addMesh(handle, this.bodyMat);
-      Th = Wd;
-      hy = this.handleAxisY - R;
       neck = Lh + 18 - neckX; // grip starts past the cradle
     } else {
       const hb = Math.min(2, Th / 4);
@@ -749,19 +748,22 @@ class Exo {
     const K = this.knots(d), o = this.orig, pos = geom.attributes.position.array;
     const dz = d.headWidth / 2 - EXO.sideHookZ; // side hooks slide out to the head width
     const zArm = (EXO.sideLipZ + dz - EXO.plateHalfWidth) / (EXO.sideLipZ - EXO.plateHalfWidth);
-    // The cradle radius follows the handle with the wall thickness kept. Its bottom stays on the plate,
-    // so a thicker handle makes it grow upwards rather than pulling it away from the plate.
-    const dR = d.handleWidth / 2 - EXO.cradleRadius, cy = EXO.cradleCenterY;
+    // The half-circle cradle becomes a channel as wide as the flat handle and as deep as it is thick,
+    // with the wall thickness kept. Its bottom stays on the plate, so a thicker handle raises the rim.
+    const R = EXO.cradleRadius, cy = EXO.cradleCenterY, n = EXO.cradleSquareness;
+    const ha = d.handleWidth / 2, hb = d.handleThickness, cy2 = cy - R + hb;
+    const se = (c) => Math.sign(c) * Math.abs(c) ** (2 / n);
     const sBase = K.ys[1] - K.xs[1]; // the cradle moves with the base of the head as one block
     const kGap = d.thickness / REF.thickness, dGap = d.thickness - REF.thickness; // lips clear the head's edge
     for (let i = 0; i < o.length; i += 3) {
       const x = o[i], y = o[i + 1], z = o[i + 2];
       let X = this.mapX(x, K), Y = y, Z = z;
       if (this.cradleMask[i / 3]) {
-        const dy = y - cy, r = Math.hypot(z, dy), k = r > 1e-6 ? (r + dR) / r : 1;
+        const dy = y - cy, r = Math.hypot(z, dy), c = r > 1e-6 ? z / r : 1, sn = r > 1e-6 ? dy / r : 0;
+        const wall = r - R; // distance out from the inner surface
         X = x + sBase;
-        Z = z * k;
-        Y = cy + dR + dy * k;
+        Z = ha * se(c) + wall * c;
+        Y = cy2 + hb * se(sn) + wall * sn;
       } else {
         const az = Math.abs(z);
         if (az > EXO.plateHalfWidth) {
@@ -782,8 +784,8 @@ class Exo {
   // A landmark's x (STL axes) -> x in the scene, for the given measurements.
   xAt(xStl, d) { return -this.mapX(xStl, this.knots(d)); }
 
-  // Height of the handle's centre line above the plate's resting face (it sits in the cradle).
-  handleAxis(d) { return EXO.cradleCenterY + d.handleWidth / 2 - EXO.cradleRadius - EXO.plateTop; }
+  // Height of the back of the handle (the bottom of the cradle channel) relative to the plate's resting face.
+  handleBottom() { return EXO.cradleCenterY - EXO.cradleRadius - EXO.plateTop; }
 
   deform(d) {
     if (this.last && dimsClose(this.last, d, 0.05)) return;
@@ -842,7 +844,7 @@ class ExistingProduct {
     this.exo = new Exo(stl);
     this.group.add(this.exo.mesh);
     this.brush = new BrushModel('ghost', { ghost: true });
-    this.brush.handleAxisY = this.exo.handleAxis(REF); // the handle runs through the middle of the cradle
+    this.brush.handleBottomY = this.exo.handleBottom(); // the handle's back lies in the cradle channel
     this.brush.group.renderOrder = 2;
     this.group.add(this.brush.group);
     this.ghostLevel = 0;
@@ -885,7 +887,6 @@ class ExistingProduct {
   update(d, dt) {
     this.d = d;
     this.exo.deform(d);
-    this.brush.handleAxisY = this.exo.handleAxis(d);
     this.brush.update(d);
     const b = this.brush.info;
     this.bx = this.exo.xAt(EXO.tipX, d); // the head tip sits against the top hook
@@ -905,6 +906,8 @@ class ExistingProduct {
     L.headWidth.set(V3(bx - 12, top, -b.Wh / 2), V3(bx - 12, top, b.Wh / 2), V3(-1, 0, 0), b.Wh, o);
     const hx = bx + (b.gripX0 + b.endX) / 2, hy = by + b.handleTop + 3;
     L.handleWidth.set(V3(hx, hy, -b.Wd / 2), V3(hx, hy, b.Wd / 2), V3(1, 0, 0), b.Wd, o);
+    const tx = hx + 30, tz = b.Wd / 2 + 4;
+    L.handleThickness.set(V3(tx, by + b.handleTop - b.Th, tz), V3(tx, by + b.handleTop, tz), V3(0, 0, 1), b.Th, o);
     L.thickness.set(V3(bx + b.Lh * 0.5, by, b.Wh / 2 + 4), V3(bx + b.Lh * 0.5, top, b.Wh / 2 + 4), V3(0, 0, 1), this.d.thickness, o);
   }
 
@@ -1634,7 +1637,7 @@ function renderFit() {
     <span class="fit-title">Exoskeleton fitted</span>
     <span class="fit-chip">head length <b>${pct(d.headLength, REF.headLength)}</b></span>
     <span class="fit-chip">head width <b>${pct(d.headWidth, REF.headWidth)}</b></span>
-    <span class="fit-chip">cradle <b>${pct(d.handleWidth, REF.handleWidth)}</b></span>
+    <span class="fit-chip">cradle <b>${d.handleWidth} × ${d.handleThickness} mm</b></span>
     <span class="fit-chip">lip gap <b>${d.thickness} mm</b></span>`;
 }
 

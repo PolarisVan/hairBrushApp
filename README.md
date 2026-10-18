@@ -44,7 +44,7 @@ The exoskeleton only fits the brush **head**. Each measurement moves the part th
 - **Head length** sets the distance from the top hook (the tip of the head) to the C-cradle (the base of the head). The cross-arms stay at the head's widest point, and the plate in between stretches.
 - **Head width** slides the side hooks out or in so their inner faces meet the sides of the head.
 - **Head edge thickness** raises or lowers every hook lip so the gap under it matches the rim.
-- **Handle width** widens or narrows the cradle.
+- **Handle width** and **handle thickness** reshape the half-circle cradle into a flat-bottomed channel that wraps the flat handle, keeping its wall thickness. The bottom stays on the plate, so a thicker handle raises the rim.
 - **Total length** only changes the preview handle.
 
 On the Review step, **Download fitted STL** exports that deformed mesh. It's a straight stretch of the original, so check clearances before printing.
