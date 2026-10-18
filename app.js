@@ -12,17 +12,23 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 const CONFIG = {
   stlPath: 'ExoSkeletonV2.STL',
   currency: '$',
-  // The brush the exoskeleton STL was modelled around (mm). User inputs scale the STL relative to this.
-  referenceBrush: { length: 230, headLength: 100, headWidth: 80, handleWidth: 28, thickness: 12 },
-  // Landmarks on the STL in its own axes, once centred (mm). x runs along the length,
-  // y is up from the bottom of the back plate (the brush sits on the +y side).
+  // The exoskeleton only fits the brush HEAD: the top hook takes the tip, the two side hooks take
+  // the sides at the widest point, and the C-cradle takes the start of the handle.
+  // Landmarks are in the STL's own axes once centred (mm): x along the length with the head tip
+  // at +x, y up from the bottom of the back plate (the brush sits on +y), z across.
   exo: {
-    headEnd: '+x',    // end the brush head sits at: '+x' = the hanging-loop end, '-x' = the C-cradle end
-    headX: 60,        // centre of the brush head along x
-    neck: [13, 34],   // stretch where the plate changes from head width to handle width
-    plateTop: 7.6,    // top face of the back plate (the brush rests here)
-    mirrorX: 58,      // where the back mirror sits under the head
-    engraveX: 33, engraveLen: 60, engraveH: 7, // engraving strip on the underside
+    tipX: 74.37,            // inner face of the top hook: the tip of the head
+    topHookX: 69.29,        // the top hook starts here
+    armX: [-22.33, -9.63],  // the cross-arms carrying the side hooks
+    baseX: -60.71,          // where the C-cradle starts: the base of the head
+    sideHookZ: 44.46,       // inner face of each side hook: half the head width
+    sideLipZ: 39.38,        // beyond this |z| the side hooks keep their shape
+    plateHalfWidth: 15,     // half-width of the back plate
+    cradleHalfWidth: 12.45, // half-width of the C-cradle: half the handle width
+    plateTop: 7.62,         // the head rests on this face ...
+    lipBottom: 10.67,       // ... and the hook lips close over its edge here
+    totalLength: 250,       // brush length assumed for the preview handle
+    engraveH: 7,            // height of the engraving strip on the underside
   },
   basePrice: 24,
   engravingPrice: 5,
@@ -75,11 +81,11 @@ const UPGRADES = [
   { id: 'mount', name: 'Magnetic wall mount', blurb: 'A magnet in the handle end and a matching wall plate.', price: 6 },
 ];
 const DIM_FIELDS = [
-  { key: 'length', label: 'Total length', min: 160, max: 300, hint: 'Tip of the head to the end of the handle.' },
-  { key: 'headLength', label: 'Head length', min: 60, max: 140, hint: 'The part with bristles, measured lengthwise.' },
-  { key: 'headWidth', label: 'Head width', min: 40, max: 110, hint: 'Widest point across the head.' },
-  { key: 'handleWidth', label: 'Handle width', min: 16, max: 40, hint: 'Across the handle where you grip it.' },
-  { key: 'thickness', label: 'Head thickness', min: 6, max: 24, hint: 'From the back of the head to the bristle base.' },
+  { key: 'headLength', label: 'Head length', min: 70, max: 180, hint: 'Tip of the head to where it meets the handle. Sets where the top hook and the cradle sit.' },
+  { key: 'headWidth', label: 'Head width', min: 45, max: 120, hint: 'Widest point across the head. The side hooks clip on here.' },
+  { key: 'thickness', label: 'Head edge thickness', min: 1, max: 15, hint: 'How thick the rim of the head is where the hook lips close over it.' },
+  { key: 'handleWidth', label: 'Handle width', min: 15, max: 40, hint: 'Across the handle just below the head, where the cradle cups it.' },
+  { key: 'length', label: 'Total length', min: 160, max: 320, hint: 'Only used for the preview: the exoskeleton covers the head, not the handle.' },
 ];
 const DESIGN_ART = {
   paddle: '<svg viewBox="0 0 120 40"><rect x="3" y="3" width="50" height="34" rx="11"/><path d="M50 15c9 0 11 2 20 2h41a3 3 0 0 1 0 6H70c-9 0-11 2-20 2z"/></svg>',
@@ -88,18 +94,16 @@ const DESIGN_ART = {
   slim: '<svg viewBox="0 0 120 40"><rect x="3" y="11" width="54" height="18" rx="9"/><path d="M55 17c6 0 8 1 15 1h41a2 2 0 0 1 0 4H70c-7 0-9 1-15 1z"/></svg>',
 };
 
-const REF = CONFIG.referenceBrush;
-// Internally the head is always on −x; an STL whose head end is +x is turned 180° on load.
-const EXO_FLIP = CONFIG.exo.headEnd === '+x';
-const exoIn = (x) => (EXO_FLIP ? -x : x);
-const EXO = {
-  ...CONFIG.exo,
-  headX: exoIn(CONFIG.exo.headX),
-  neckStart: Math.min(exoIn(CONFIG.exo.neck[0]), exoIn(CONFIG.exo.neck[1])),
-  neckEnd: Math.max(exoIn(CONFIG.exo.neck[0]), exoIn(CONFIG.exo.neck[1])),
-  mirrorX: exoIn(CONFIG.exo.mirrorX),
-  engraveX: exoIn(CONFIG.exo.engraveX),
+const EXO = CONFIG.exo;
+// The brush the STL fits exactly, read off its landmarks. Measurements move the exo relative to this.
+const REF = {
+  length: EXO.totalLength,
+  headLength: EXO.tipX - EXO.baseX,
+  headWidth: 2 * EXO.sideHookZ,
+  handleWidth: 2 * EXO.cradleHalfWidth,
+  thickness: EXO.lipBottom - EXO.plateTop,
 };
+const REF_START = Object.fromEntries(Object.entries(REF).map(([k, v]) => [k, Math.round(v)]));
 const DIM_KEYS = Object.keys(REF);
 const UP = new THREE.Vector3(0, 1, 0);
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -538,7 +542,7 @@ class BrushModel {
 
   buildFlat(d) {
     const st = STYLES[this.ghost ? 'ghost' : this.style];
-    const L = d.length, Lh = clamp(d.headLength, 40, L - 60), Wh = d.headWidth, T = d.thickness, Wd = d.handleWidth;
+    const L = d.length, Lh = clamp(d.headLength, 40, L - 50), Wh = d.headWidth, T = d.thickness, Wd = d.handleWidth;
     const bev = Math.min(2.5, T / 4);
     const head = slab(superellipseShape(Lh / 2 - bev, Wh / 2 - bev, st.n), T, bev);
     head.translate(Lh / 2, 0, 0);
@@ -549,7 +553,8 @@ class BrushModel {
     const neckX = Lh - 10;
     const { shape, neck } = handleShape(neckX, L - hb, Math.min(Wd * 0.75, Wh * 0.6), Wd);
     const handle = slab(shape, Th, hb);
-    handle.translate(0, (T - Th) / 2, 0);
+    const hy = Math.max(0, (T - Th) / 2); // a thin head mustn't push the handle below its back
+    handle.translate(0, hy, 0);
     this.addMesh(handle, this.bodyMat);
 
     let brBase = T;
@@ -561,13 +566,13 @@ class BrushModel {
     }
     this.info = {
       round: false, L, Lh, Wh, T, Th, Wd, n: st.n, brBase, brLen: st.brLen,
-      handleY: T / 2, handleTop: T / 2 + Th / 2, handleThk: Th, endX: L,
+      handleY: hy + Th / 2, handleTop: hy + Th, handleThk: Th, endX: L,
       gripX0: neckX + neck + 4, bristleTop: brBase + st.brLen,
     };
   }
 
   buildRound(d) {
-    const L = d.length, Lh = clamp(d.headLength, 40, L - 60), Wh = d.headWidth, Wd = d.handleWidth;
+    const L = d.length, Lh = clamp(d.headLength, 40, L - 50), Wh = d.headWidth, Wd = d.handleWidth;
     const R = Math.max(9, Wh * 0.2), cy = Wh / 2, brLen = Math.max(6, Wh / 2 - R - 1);
     const barrel = new THREE.CylinderGeometry(R, R, Lh, 48, 1);
     barrel.rotateZ(Math.PI / 2).translate(Lh / 2, cy, 0);
@@ -662,14 +667,12 @@ class Exo {
   constructor(src) {
     const g = src.clone();
     g.computeBoundingBox();
-    const bb = g.boundingBox;
-    g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
-    if (EXO_FLIP) g.rotateY(Math.PI);
+    const bb = g.boundingBox, cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+    g.translate(-cx, -bb.min.y, -cz);
+    this.bounds = [bb.min.x - cx, bb.max.x - cx];
+    this.orig = g.attributes.position.array.slice(); // STL axes, centred
     g.deleteAttribute('normal');
-    g.computeVertexNormals();
-    this.halfLen = (bb.max.x - bb.min.x) / 2;
     this.geom = g;
-    this.orig = g.attributes.position.array.slice();
     this.material = makeBodyMat();
     this.mesh = new THREE.Mesh(g, this.material);
     this.mesh.castShadow = true;
@@ -677,24 +680,50 @@ class Exo {
     this.last = null;
   }
 
-  scales(d) {
+  // Along x the cradle, the cross-arms and the top hook move as rigid blocks so the hooks keep
+  // their shape; the plate between them stretches. Head length sets the tip-to-cradle distance,
+  // and the arms stay at the same fraction of the head (its widest point).
+  knots(d) {
+    const k = d.headLength / REF.headLength, c = (EXO.tipX + EXO.baseX) / 2;
+    const shift = (x) => c + (x - c) * k - x;
+    const sBase = shift(EXO.baseX), sArm = shift((EXO.armX[0] + EXO.armX[1]) / 2), sTip = shift(EXO.tipX);
+    const [lo, hi] = this.bounds;
     return {
-      head: d.headLength / REF.headLength, total: d.length / REF.length,
-      zHead: d.headWidth / REF.headWidth, zHandle: d.handleWidth / REF.handleWidth,
-      y: d.thickness / REF.thickness,
+      xs: [lo, EXO.baseX, EXO.armX[0], EXO.armX[1], EXO.topHookX, hi],
+      ys: [lo + sBase, EXO.baseX + sBase, EXO.armX[0] + sArm, EXO.armX[1] + sArm, EXO.topHookX + sTip, hi + sTip],
     };
   }
 
-  // Head side stretches with head length, handle side with total length; width blends from head to
-  // handle across the neck; only the hooks above the plate grow with thickness.
-  deformInto(geom, d) {
-    const s = this.scales(d), E = EXO, o = this.orig, pos = geom.attributes.position.array;
-    const ky = lerp(1, s.y, 0.7);
+  mapX(x, K) {
+    const { xs, ys } = K;
+    if (x <= xs[0]) return ys[0] + (x - xs[0]);
+    for (let i = 1; i < xs.length; i++) if (x <= xs[i]) return lerp(ys[i - 1], ys[i], (x - xs[i - 1]) / (xs[i] - xs[i - 1]));
+    return ys[ys.length - 1] + (x - xs[xs.length - 1]);
+  }
+
+  // Internally the head tip points to −x, so the display mesh is the STL turned 180° about y.
+  // Pass stlAxes = true to keep the STL's own orientation (for export).
+  deformInto(geom, d, stlAxes = false) {
+    const K = this.knots(d), o = this.orig, pos = geom.attributes.position.array;
+    const dz = d.headWidth / 2 - EXO.sideHookZ; // side hooks slide out to the head width
+    const zArm = (EXO.sideLipZ + dz - EXO.plateHalfWidth) / (EXO.sideLipZ - EXO.plateHalfWidth);
+    const kCradle = d.handleWidth / REF.handleWidth; // cradle widens with the handle
+    const kGap = d.thickness / REF.thickness, dGap = d.thickness - REF.thickness; // lips clear the head's edge
     for (let i = 0; i < o.length; i += 3) {
       const x = o[i], y = o[i + 1], z = o[i + 2];
-      pos[i] = this.mapX(x, s);
-      pos[i + 1] = y <= E.plateTop ? y : E.plateTop + (y - E.plateTop) * ky;
-      pos[i + 2] = z * lerp(s.zHead, s.zHandle, smoothstep(E.neckStart, E.neckEnd, x));
+      let X = this.mapX(x, K), Y = y, Z = z;
+      if (x < EXO.baseX + 0.01) {
+        Z = z * kCradle;
+      } else {
+        const az = Math.abs(z);
+        if (az > EXO.plateHalfWidth) {
+          Z = Math.sign(z) * (az >= EXO.sideLipZ ? az + dz : EXO.plateHalfWidth + (az - EXO.plateHalfWidth) * zArm);
+        }
+        if (y > EXO.plateTop) Y = y >= EXO.lipBottom ? y + dGap : EXO.plateTop + (y - EXO.plateTop) * kGap;
+      }
+      pos[i] = stlAxes ? X : -X;
+      pos[i + 1] = Y;
+      pos[i + 2] = stlAxes ? Z : -Z;
     }
     geom.attributes.position.needsUpdate = true;
     geom.computeVertexNormals();
@@ -702,8 +731,8 @@ class Exo {
     geom.computeBoundingSphere();
   }
 
-  // Head side (−x) stretches with head length, handle side with total length.
-  mapX(x, s) { return x < 0 ? x * s.head : x * s.total; }
+  // A landmark's x (STL axes) -> x in the scene, for the given measurements.
+  xAt(xStl, d) { return -this.mapX(xStl, this.knots(d)); }
 
   deform(d) {
     if (this.last && dimsClose(this.last, d, 0.05)) return;
@@ -785,9 +814,8 @@ class ExistingProduct {
     this.d = d;
     this.exo.deform(d);
     this.brush.update(d);
-    const b = this.brush.info, s = this.exo.scales(d);
-    this.s = s;
-    this.bx = this.exo.mapX(EXO.headX, s) - b.Lh / 2;
+    const b = this.brush.info;
+    this.bx = this.exo.xAt(EXO.tipX, d); // the head tip sits against the top hook
     this.by = EXO.plateTop;
     this.brush.group.position.set(this.bx, this.by + 20 * this.explode, 0);
     this.exo.mesh.position.y = -22 * this.explode;
@@ -807,26 +835,29 @@ class ExistingProduct {
   }
 
   extentX() {
-    const b = this.brush.info;
-    const xmin = Math.min(-this.exo.halfLen * this.s.head, this.bx), xmax = this.bx + b.endX;
+    const b = this.brush.info, [lo, hi] = this.exo.bounds;
+    const xmin = Math.min(this.exo.xAt(hi, this.d), this.bx);
+    const xmax = Math.max(this.bx + b.endX, this.exo.xAt(lo, this.d));
     return [xmin, xmax];
   }
 
   anchors() {
-    const b = this.brush.info, s = this.s, E = EXO, bx = this.bx, by = this.by;
+    const b = this.brush.info, d = this.d, bx = this.bx, by = this.by, at = (x) => this.exo.xAt(x, d);
     const [xmin, xmax] = this.extentX();
-    const exoEnd = this.exo.halfLen * s.total;
+    const exoEnd = at(this.exo.bounds[0]); // far end of the cradle
     const x1 = bx + b.endX - 8;
     let x0 = Math.max(bx + b.gripX0, exoEnd + 6);
     if (x1 - x0 < 30) x0 = x1 - 30;
-    const mr = Math.min(13 * s.zHead, 14 * s.head);
+    // mirror between the cradle and the cross-arms; engraving along the neck up to the top hook
+    const m0 = at(EXO.armX[0]), m1 = at(EXO.baseX), mr = Math.max(4, Math.min(13, (m1 - m0) / 2 - 1.5));
+    const e0 = at(EXO.topHookX), e1 = at(EXO.armX[1]);
     return {
       length: xmax - xmin,
       center: V3((xmin + xmax) / 2, by + b.T * 0.5 + 6, 0),
       head: V3(bx + b.Lh / 2, by + b.bristleTop * 0.6, 0),
       handle: { x0, x1, y: by + b.handleY, w: b.Wd, t: b.Th },
-      back: { pos: V3(this.exo.mapX(E.mirrorX, s), -0.5, 0), rx: mr, rz: mr },
-      engrave: { pos: V3(this.exo.mapX(E.engraveX, s), -0.35, 0), w: E.engraveLen * (E.engraveX < 0 ? s.head : s.total), h: E.engraveH * s.zHandle, up: false },
+      back: { pos: V3((m0 + m1) / 2, -0.5, 0), rx: mr, rz: mr },
+      engrave: { pos: V3((e0 + e1) / 2, -0.35, 0), w: (e1 - e0) * 0.75, h: EXO.engraveH, up: false },
       end: V3(bx + b.endX, by + b.handleY, 0),
     };
   }
@@ -1097,13 +1128,13 @@ const PART_TYPES = { grip: GripPart, mirror: MirrorPart, mount: MountPart, engra
    ===================================================================== */
 const state = {
   mode: null, step: 0,
-  dims: { ...REF },
+  dims: { ...REF_START },
   design: 'paddle', size: 'm', bristle: 'nylon',
   upgrades: new Set(),
   color: 'cobalt', finish: 'satin', engraving: '',
   ghost: true, explode: false, spin: true,
 };
-const cur = { dims: { ...REF }, explode: 0 };
+const cur = { dims: { ...REF_START }, explode: 0 };
 let stlGeometry = null;
 let product = null;
 let lastInteraction = -10;
@@ -1464,7 +1495,7 @@ const VIEWS = {
   review: () => `
     <h2 data-stagger>Review your brush</h2>
     <p class="lede" data-stagger>${state.mode === 'existing'
-      ? `An exoskeleton fitted to your ${state.dims.length} × ${state.dims.headWidth} mm brush.`
+      ? `An exoskeleton fitted to your ${state.dims.headLength} × ${state.dims.headWidth} mm brush head.`
       : `${DESIGNS.find((d) => d.id === state.design).name}, ${SIZES.find((s) => s.id === state.size).name.toLowerCase()} size, ${state.dims.length} mm long.`}</p>
     <ul class="lines" data-stagger>
       ${priceLines().map(([n, p]) => `<li><span>${escapeHtml(n)}</span><span>${p ? money(p) : '—'}</span></li>`).join('')}
@@ -1490,8 +1521,8 @@ function renderFit() {
     <span class="fit-title">Exoskeleton fitted</span>
     <span class="fit-chip">head length <b>${pct(d.headLength, REF.headLength)}</b></span>
     <span class="fit-chip">head width <b>${pct(d.headWidth, REF.headWidth)}</b></span>
-    <span class="fit-chip">handle <b>${pct(d.handleWidth, REF.handleWidth)}</b></span>
-    <span class="fit-chip">body <b>${pct(d.length, REF.length)}</b></span>`;
+    <span class="fit-chip">cradle <b>${pct(d.handleWidth, REF.handleWidth)}</b></span>
+    <span class="fit-chip">lip gap <b>${d.thickness} mm</b></span>`;
 }
 
 function setActiveDim(key) {
@@ -1511,7 +1542,7 @@ const BIND = {
       v = clamp(Math.round(+v || 0), f.min, f.max);
       state.dims[k] = v;
       if (k === 'length' || k === 'headLength') {
-        state.dims.headLength = Math.min(state.dims.headLength, state.dims.length - 60);
+        state.dims.headLength = Math.min(state.dims.headLength, state.dims.length - 50);
         const hl = panelBody.querySelectorAll('[data-key="headLength"]');
         hl.forEach((el) => { if (el.tagName === 'INPUT') { el.value = state.dims.headLength; if (el.type === 'range') setRangeFill(el); } });
       }
@@ -1629,7 +1660,7 @@ function startFlow(mode) {
   state.step = 0;
   state.explode = false;
   if (mode === 'existing') {
-    state.dims = { ...REF };
+    state.dims = { ...REF_START };
     if (product?.kind !== 'existing') swapProduct(new ExistingProduct(stlGeometry));
     product.setGhost(state.ghost);
   } else {
@@ -1648,7 +1679,7 @@ function goStep(i) {
 
 function resetAll() {
   Object.assign(state, {
-    mode: null, step: 0, dims: { ...REF }, design: 'paddle', size: 'm', bristle: 'nylon',
+    mode: null, step: 0, dims: { ...REF_START }, design: 'paddle', size: 'm', bristle: 'nylon',
     upgrades: new Set(), color: 'cobalt', finish: 'satin', engraving: '', ghost: true, explode: false,
   });
   shownPrice = 0;
@@ -1688,14 +1719,13 @@ function placeOrder() {
 
 function downloadFittedSTL() {
   const geom = product.exo.geom.clone();
-  product.exo.deformInto(geom, state.dims);
-  if (EXO_FLIP) geom.rotateY(Math.PI); // back to the STL's original orientation
+  product.exo.deformInto(geom, state.dims, true); // keep the STL's original orientation
   const data = new STLExporter().parse(new THREE.Mesh(geom), { binary: true });
   geom.dispose();
   const url = URL.createObjectURL(new Blob([data], { type: 'model/stl' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `exoskeleton-fit-${state.dims.length}x${state.dims.headWidth}.stl`;
+  a.download = `exoskeleton-fit-${state.dims.headLength}x${state.dims.headWidth}.stl`;
   document.body.appendChild(a);
   a.click();
   a.remove();

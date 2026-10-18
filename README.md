@@ -25,18 +25,19 @@ You can't open `index.html` directly from the file system, because browsers bloc
 
 Everything you're likely to change is at the top of `app.js`:
 
-- `CONFIG.referenceBrush`: the brush size the STL was modelled around. Measurements are scaled relative to this.
-- `CONFIG.exo`: landmarks on the STL in mm, such as the cross-arm position, the neck where the plate narrows, and the top of the back plate. If you export a new version of the exoskeleton, update these so the brush preview and upgrades line up.
+- `CONFIG.exo`: where the exoskeleton touches the brush, in mm in the STL's own axes: the inner faces of the top hook, the side hooks and the C-cradle, and the gap under the hook lips. The reference brush size is worked out from these. If you change the STL in CAD, update these so the fitting and the preview line up.
 - `COLORS`, `FINISHES`, `DESIGNS`, `BRISTLES`, `UPGRADES`: options and prices.
 
 To swap in a new STL, replace `ExoSkeletonV2.STL` or change `CONFIG.stlPath`.
 
 ## How fitting works
 
-The exoskeleton is deformed vertex by vertex:
+The exoskeleton only fits the brush **head**. Each measurement moves the part that touches it, and the hooks keep their shape:
 
-- The head side stretches with head length, and the handle side with total length.
-- Width blends from head width to handle width across the neck.
-- Only the hooks above the plate grow with thickness.
+- **Head length** sets the distance from the top hook (the tip of the head) to the C-cradle (the base of the head). The cross-arms stay at the head's widest point, and the plate in between stretches.
+- **Head width** slides the side hooks out or in so their inner faces meet the sides of the head.
+- **Head edge thickness** raises or lowers every hook lip so the gap under it matches the rim.
+- **Handle width** widens or narrows the cradle.
+- **Total length** only changes the preview handle.
 
 On the Review step, **Download fitted STL** exports that deformed mesh. It's a straight stretch of the original, so check clearances before printing.
