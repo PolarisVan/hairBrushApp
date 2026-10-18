@@ -10,7 +10,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
    CONFIG — edit these to match your model and pricing
    ===================================================================== */
 const CONFIG = {
-  stlPath: 'ExoSkeletonV2.STL',
+  stlPath: 'ExoSkeletonV3.STL',
+  hookPath: 'HangingHook.STL', // the optional hanging hook (an upgrade), in its own frame
   currency: '$',
   // The exoskeleton only fits the brush HEAD: the top hook takes the tip, the two side hooks take
   // the sides at the widest point, and the C-cradle takes the start of the handle.
@@ -19,16 +20,18 @@ const CONFIG = {
   exo: {
     tipX: 74.37,            // inner face of the top hook: the tip of the head
     topHookX: 69.29,        // the top hook starts here
-    armX: [-22.33, -9.63],  // the cross-arms carrying the side hooks
+    armX: [-18.98, -12.98], // the cross-arms carrying the side hooks
     baseX: -60.71,          // where the C-cradle starts: the base of the head
     sideHookZ: 44.46,       // inner face of each side hook: half the head width
     sideLipZ: 39.38,        // beyond this |z| the side hooks keep their shape
     plateHalfWidth: 15,     // half-width of the back plate
     cradleHalfWidth: 12.45, // half-width of the C-cradle: half the handle width
+    plateBottom: 4.42,      // underside of the back plate
     plateTop: 7.62,         // the head rests on this face ...
     lipBottom: 10.67,       // ... and the hook lips close over its edge here
     totalLength: 250,       // brush length assumed for the preview handle
     engraveH: 7,            // height of the engraving strip on the underside
+    hookAt: [69.29, -13.55], // x, z where the hanging hook's stub meets the plate end (top end, to one side)
   },
   basePrice: 24,
   engravingPrice: 5,
@@ -72,6 +75,7 @@ const ICONS = {
   grip: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="4"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>',
   mirror: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8.5 10.5l3-3M9.5 14l5-5"/></svg>',
   mount: '<svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4"/><path d="M6 8h3M15 8h3"/></svg>',
+  hang: '<svg viewBox="0 0 24 24"><path d="M12 3v7"/><path d="M12 10a5 5 0 1 0 5 5"/><circle cx="12" cy="3" r="1"/></svg>',
   upgrade: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="9" height="14" rx="3"/><path d="M13 12h7"/><path d="M17 3l2 2-2 2M19 5h-4"/></svg>',
   create: '<svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8L18 21l-.8-2.4-2-.8 2-.8z"/></svg>',
 };
@@ -79,6 +83,7 @@ const UPGRADES = [
   { id: 'grip', name: 'Ergo grip sleeve', blurb: 'Soft-touch ribbed sleeve that stops the handle slipping.', price: 9 },
   { id: 'mirror', name: 'Back mirror', blurb: 'Shatter-proof mirror set into the back of the head.', price: 7 },
   { id: 'mount', name: 'Magnetic wall mount', blurb: 'A magnet in the handle end and a matching wall plate.', price: 6 },
+  { id: 'hang', name: 'Hanging hook', blurb: 'A small printed hook at the top so the brush hangs on a peg.', price: 3 },
 ];
 const DIM_FIELDS = [
   { key: 'headLength', label: 'Head length', min: 70, max: 180, hint: 'Tip of the head to where it meets the handle. Sets where the top hook and the cradle sit.' },
@@ -856,8 +861,9 @@ class ExistingProduct {
       center: V3((xmin + xmax) / 2, by + b.T * 0.5 + 6, 0),
       head: V3(bx + b.Lh / 2, by + b.bristleTop * 0.6, 0),
       handle: { x0, x1, y: by + b.handleY, w: b.Wd, t: b.Th },
-      back: { pos: V3((m0 + m1) / 2, -0.5, 0), rx: mr, rz: mr },
-      engrave: { pos: V3((e0 + e1) / 2, -0.35, 0), w: (e1 - e0) * 0.75, h: EXO.engraveH, up: false },
+      back: { pos: V3((m0 + m1) / 2, EXO.plateBottom - 0.5, 0), rx: mr, rz: mr },
+      engrave: { pos: V3((e0 + e1) / 2, EXO.plateBottom - 0.35, 0), w: (e1 - e0) * 0.75, h: EXO.engraveH, up: false },
+      hang: { pos: V3(at(EXO.hookAt[0]) + 0.3, EXO.plateBottom, -EXO.hookAt[1]) }, // scene axes are the STL turned 180°
       end: V3(bx + b.endX, by + b.handleY, 0),
     };
   }
@@ -893,6 +899,8 @@ class NewProduct {
       back: { pos: V3(b.Lh / 2, -0.5, 0), rx: b.Lh * 0.28, rz: b.Wh * 0.28 },
       engrave: { pos: V3(lerp(b.gripX0, b.endX, 0.5), b.handleTop + 0.3, 0), w: Math.min(70, (b.endX - b.gripX0) * 0.62), h: b.Wd * 0.5, up: true },
       end: V3(b.endX, b.handleY, 0),
+      // off the centre of the tip, at mid-thickness where the edge is full width (not bevelled)
+      hang: { pos: b.round ? V3(-b.R + 1, b.cy - 0.38, 0) : V3(1, b.T / 2 - 0.38, 0) },
     };
   }
 
@@ -1121,7 +1129,30 @@ class EngravePart extends Part {
   }
 }
 
-const PART_TYPES = { grip: GripPart, mirror: MirrorPart, mount: MountPart, engrave: EngravePart };
+// The hanging hook from HangingHook.STL: its stub sits at the local origin and it points along +x,
+// so it's turned 180° to point out of the top end of the brush. It takes the body's colour and finish.
+class HookPart extends Part {
+  constructor(p) {
+    super(p, 'hang');
+    this.mat = makeBodyMat();
+    this.mesh = new THREE.Mesh(hookGeometry, this.mat);
+    this.mesh.rotation.y = Math.PI;
+    this.mesh.castShadow = true;
+    this.pop.add(this.mesh);
+    this.explodeDir.set(-18, p.kind === 'existing' ? -22 : 0, 0);
+  }
+  place(a, e) {
+    this.group.position.copy(a.hang.pos).addScaledVector(this.explodeDir, e);
+    const body = this.product.bodyMaterials[0];
+    this.mat.color.copy(body.color);
+    this.mat.roughness = body.roughness;
+    this.mat.metalness = body.metalness;
+    this.mat.clearcoat = body.clearcoat;
+  }
+  view(a) { return { target: a.hang.pos.clone().add(V3(-4, 0, 0)), r: 120, phi: 0.9, theta: -0.7 }; }
+}
+
+const PART_TYPES = { grip: GripPart, mirror: MirrorPart, mount: MountPart, engrave: EngravePart, hang: HookPart };
 
 /* =====================================================================
    App state
@@ -1136,6 +1167,7 @@ const state = {
 };
 const cur = { dims: { ...REF_START }, explode: 0 };
 let stlGeometry = null;
+let hookGeometry = null;
 let product = null;
 let lastInteraction = -10;
 
@@ -1720,7 +1752,15 @@ function placeOrder() {
 function downloadFittedSTL() {
   const geom = product.exo.geom.clone();
   product.exo.deformInto(geom, state.dims, true); // keep the STL's original orientation
-  const data = new STLExporter().parse(new THREE.Mesh(geom), { binary: true });
+  const out = new THREE.Group();
+  out.add(new THREE.Mesh(geom));
+  if (state.upgrades.has('hang')) {
+    const hook = new THREE.Mesh(hookGeometry);
+    hook.position.set(product.exo.mapX(EXO.hookAt[0], product.exo.knots(state.dims)) - 0.3, EXO.plateBottom, EXO.hookAt[1]);
+    out.add(hook);
+  }
+  out.updateMatrixWorld(true);
+  const data = new STLExporter().parse(out, { binary: true });
   geom.dispose();
   const url = URL.createObjectURL(new Blob([data], { type: 'model/stl' }));
   const a = document.createElement('a');
@@ -1783,9 +1823,13 @@ function frame() {
 async function boot() {
   const loader = $('#loader');
   try {
-    const res = await fetch(CONFIG.stlPath);
-    if (!res.ok) throw new Error(`Could not load ${CONFIG.stlPath} (${res.status})`);
-    stlGeometry = new STLLoader().parse(await res.arrayBuffer());
+    const load = async (path) => {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error(`Could not load ${path} (${res.status})`);
+      return new STLLoader().parse(await res.arrayBuffer());
+    };
+    [stlGeometry, hookGeometry] = await Promise.all([load(CONFIG.stlPath), load(CONFIG.hookPath)]);
+    hookGeometry.userData.keep = true;
   } catch (err) {
     $('#loader-text').textContent = `Couldn’t load the brush model: ${err.message}`;
     loader.classList.add('is-error');
