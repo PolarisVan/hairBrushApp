@@ -10,6 +10,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
    CONFIG — edit these to match your model and pricing
    ===================================================================== */
 const CONFIG = {
+  modelVersion: '4.1',         // bump after changing any STL so browsers don't reuse an old cached copy
   stlPath: 'ExoSkeletonV4.STL',
   handlePath: 'Handle.STL',    // printed handle that pins onto the end of the exoskeleton
   pinPath: 'Pin.STL',          // the small cylinder that joins them (both have a matching hole)
@@ -527,6 +528,8 @@ class BrushModel {
     this.bodyMat = ghost
       ? new THREE.MeshPhysicalMaterial({ color: '#e6eeff', transparent: true, opacity: 0.28, roughness: 0.15, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide })
       : makeBodyMat();
+    this.handleMat = ghost ? this.bodyMat.clone() : this.bodyMat;
+    this.handleShow = 1; // the see-through handle fades out when the printed handle replaces it
     this.metalMat = new THREE.MeshStandardMaterial({ color: '#c9ccd3', metalness: 1, roughness: 0.32 });
     this.padMat = new THREE.MeshStandardMaterial({ color: '#2b2b30', roughness: 0.8 });
     this.meshes = [];
@@ -573,7 +576,7 @@ class BrushModel {
       neck = hs.neck;
       const handle = slab(hs.shape, Th, hb);
       handle.translate(0, hy, 0);
-      this.addMesh(handle, this.bodyMat);
+      this.addMesh(handle, this.handleMat);
     }
 
     let brBase = T;
@@ -671,7 +674,9 @@ class BrushModel {
   }
 
   setGhostOpacity(k) {
+    this.ghostK = k;
     this.bodyMat.opacity = 0.28 * k;
+    this.handleMat.opacity = 0.28 * k * this.handleShow;
     this.field.pinMat.opacity = 0.5 * k;
     this.group.visible = k > 0.002;
   }
@@ -847,7 +852,6 @@ class ExistingProduct {
     this.exo = new Exo(stl);
     this.group.add(this.exo.mesh);
     this.brush = new BrushModel('ghost', { ghost: true });
-    this.brush.headOnly = true;
     this.handleMat = makeBodyMat();
     this.handle = new PrintedHandle(handleGeometry, this.handleMat);
     this.pin = new THREE.Mesh(toLandmarkFrame(pinGeometry), new THREE.MeshStandardMaterial({ color: '#3a3a40', roughness: 0.5 }));
@@ -921,6 +925,8 @@ class ExistingProduct {
     // added: the pin slides in over the first 40%, then the handle follows it with a little bounce
     const h = this.handleLevel, kPin = ease.outCubic(clamp(h / 0.4, 0, 1)), kHandle = ease.outBack(clamp((h - 0.3) / 0.7, 0, 1));
     this.handle.mesh.visible = h > 0.31;
+    this.brush.handleShow = 1 - clamp(h / 0.5, 0, 1);
+    this.brush.setGhostOpacity(this.ghostLevel);
     this.pin.visible = h > 0.001;
     this.handle.mesh.position.set(34 * this.explode + 90 * (1 - kHandle), -22 * this.explode, 0);
     this.pin.position.set(-shift + 17 * this.explode + 40 * (1 - kPin), -22 * this.explode, 0);
@@ -941,7 +947,7 @@ class ExistingProduct {
 
   extentX() {
     const hi = this.exo.bounds[1];
-    return [Math.min(this.exo.xAt(hi, this.d), this.bx), state.upgrades.has('handle') ? this.handleEndX : this.jointX];
+    return [Math.min(this.exo.xAt(hi, this.d), this.bx), state.upgrades.has('handle') ? this.handleEndX : this.bx + this.brush.info.endX];
   }
 
   anchors() {
@@ -1998,7 +2004,7 @@ async function boot() {
   const loader = $('#loader');
   try {
     const load = async (path) => {
-      const res = await fetch(path);
+      const res = await fetch(`${path}?v=${CONFIG.modelVersion}`);
       if (!res.ok) throw new Error(`Could not load ${path} (${res.status})`);
       return new STLLoader().parse(await res.arrayBuffer());
     };
