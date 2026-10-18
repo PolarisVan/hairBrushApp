@@ -786,6 +786,9 @@ class DimLine {
 /* =====================================================================
    Products
    ===================================================================== */
+// Upgrades that are mounted on the exoskeleton itself, so they hide along with it.
+const EXO_MOUNTED = ['mirror', 'engrave', 'hang'];
+
 class ExistingProduct {
   constructor(stl) {
     this.kind = 'existing';
@@ -797,6 +800,7 @@ class ExistingProduct {
     this.group.add(this.brush.group);
     this.ghostLevel = 0;
     this.brush.setGhostOpacity(0);
+    this.exoLevel = 1;
     this.bodyMaterials = [this.exo.material];
     this.parts = new Map();
     this.explode = 0;
@@ -815,6 +819,22 @@ class ExistingProduct {
     });
   }
 
+  // Fade the exoskeleton (and the upgrades mounted on it) out of the preview and back.
+  setExo(on) {
+    cancel(this.exoTween);
+    const from = this.exoLevel, m = this.exo.material;
+    m.transparent = true;
+    this.exoTween = tween({
+      duration: 0.6, ease: ease.inOutCubic,
+      onUpdate: (k) => {
+        this.exoLevel = lerp(from, on ? 1 : 0, k);
+        m.opacity = this.exoLevel;
+        this.exo.mesh.visible = this.exoLevel > 0.01;
+      },
+      onComplete: () => { m.transparent = !on; m.needsUpdate = true; },
+    });
+  }
+
   update(d, dt) {
     this.d = d;
     this.exo.deform(d);
@@ -824,6 +844,7 @@ class ExistingProduct {
     this.by = EXO.plateTop;
     this.brush.group.position.set(this.bx, this.by + 20 * this.explode, 0);
     this.exo.mesh.position.y = -22 * this.explode;
+    for (const id of EXO_MOUNTED) { const p = this.parts.get(id); if (p) p.group.visible = this.exoLevel > 0.5; }
     this.dimsLevel = damp(this.dimsLevel, showDims() ? 1 : 0, 8, dt);
     this.updateDims(b);
   }
@@ -1163,7 +1184,7 @@ const state = {
   design: 'paddle', size: 'm', bristle: 'nylon',
   upgrades: new Set(),
   color: 'cobalt', finish: 'satin', engraving: '',
-  ghost: true, explode: false, spin: true,
+  ghost: true, showExo: true, explode: false, spin: true,
 };
 const cur = { dims: { ...REF_START }, explode: 0 };
 let stlGeometry = null;
@@ -1423,6 +1444,17 @@ function renderPanel() {
   BIND[id]?.();
   renderStepper();
   updatePrice();
+  const exoBtn = $('#exo-toggle');
+  exoBtn.hidden = state.mode !== 'existing';
+  exoBtn.setAttribute('aria-pressed', state.showExo);
+}
+
+function setShowExo(on) {
+  state.showExo = on;
+  product?.setExo?.(on);
+  $('#exo-toggle').setAttribute('aria-pressed', on);
+  const sw = $('#exo-switch');
+  if (sw) sw.checked = on;
 }
 
 const VIEWS = {
@@ -1458,7 +1490,8 @@ const VIEWS = {
         <p class="hint">${f.hint}</p>
       </div>`).join('')}
     <div class="fit" id="fit" data-stagger></div>
-    <label class="switch" data-stagger><input type="checkbox" id="ghost-toggle" ${state.ghost ? 'checked' : ''}><span class="track"></span>Show my brush in the preview</label>`,
+    <label class="switch" data-stagger><input type="checkbox" id="ghost-toggle" ${state.ghost ? 'checked' : ''}><span class="track"></span>Show my brush in the preview</label>
+    <label class="switch" data-stagger><input type="checkbox" id="exo-switch" ${state.showExo ? 'checked' : ''}><span class="track"></span>Show the exoskeleton</label>`,
 
   design: () => `
     <h2 data-stagger>Choose a design</h2>
@@ -1599,6 +1632,7 @@ const BIND = {
       el.addEventListener('blur', () => setActiveDim(null));
     });
     $('#ghost-toggle').addEventListener('change', (e) => { state.ghost = e.target.checked; product.setGhost(state.ghost); });
+    $('#exo-switch').addEventListener('change', (e) => setShowExo(e.target.checked));
     renderFit();
   },
 
@@ -1712,7 +1746,7 @@ function goStep(i) {
 function resetAll() {
   Object.assign(state, {
     mode: null, step: 0, dims: { ...REF_START }, design: 'paddle', size: 'm', bristle: 'nylon',
-    upgrades: new Set(), color: 'cobalt', finish: 'satin', engraving: '', ghost: true, explode: false,
+    upgrades: new Set(), color: 'cobalt', finish: 'satin', engraving: '', ghost: true, showExo: true, explode: false,
   });
   shownPrice = 0;
   swapProduct(new ExistingProduct(stlGeometry), { intro: product ? 'drop' : 'scan' });
@@ -1724,6 +1758,7 @@ $('#back').addEventListener('click', () => (state.step === 0 ? resetAll() : goSt
 $('#next').addEventListener('click', () => (state.step === flow().length - 1 ? placeOrder() : goStep(state.step + 1)));
 $('#brand').addEventListener('click', () => stlGeometry && resetAll());
 $('#recenter').addEventListener('click', flyToStep);
+$('#exo-toggle').addEventListener('click', () => setShowExo(!state.showExo));
 $('#spin').addEventListener('click', (e) => {
   state.spin = !state.spin;
   e.currentTarget.setAttribute('aria-pressed', state.spin);
