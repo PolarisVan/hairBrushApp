@@ -10,7 +10,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
    CONFIG — edit these to match your model and pricing
    ===================================================================== */
 const CONFIG = {
-  stlPath: 'ExoSkeletonV1.STL',
+  stlPath: 'ExoSkeletonV2.STL',
   currency: '$',
   // The brush the exoskeleton STL was modelled around (mm). User inputs scale the STL relative to this.
   referenceBrush: { length: 230, headLength: 100, headWidth: 80, handleWidth: 28, thickness: 12 },

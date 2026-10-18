@@ -2,7 +2,7 @@
 
 An animated 3D configurator for two kinds of order:
 
-- **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV1.STL` reshapes live to fit them, and they add upgrades that clip onto it.
+- **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV2.STL` reshapes live to fit them, and they add upgrades that clip onto it.
 - **Design a new one.** The customer picks a design (paddle, oval, round or slim), a size, bristles, upgrades and a finish.
 
 ## Run it
@@ -29,7 +29,7 @@ Everything you're likely to change is at the top of `app.js`:
 - `CONFIG.exo`: landmarks on the STL in mm, such as the cross-arm position, the neck where the plate narrows, and the top of the back plate. If you export a new version of the exoskeleton, update these so the brush preview and upgrades line up.
 - `COLORS`, `FINISHES`, `DESIGNS`, `BRISTLES`, `UPGRADES`: options and prices.
 
-To swap in a new STL, replace `ExoSkeletonV1.STL` or change `CONFIG.stlPath`.
+To swap in a new STL, replace `ExoSkeletonV2.STL` or change `CONFIG.stlPath`.
 
 ## How fitting works
 
