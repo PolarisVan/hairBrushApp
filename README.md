@@ -3,7 +3,7 @@
 An animated 3D configurator for two kinds of order:
 
 - **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV5.STL` reshapes live to fit the brush head. It starts on its own; a printed handle that pins onto its end is one of the upgrades.
-- **Design a new one.** The customer picks a design (paddle, oval, round or slim), a size, bristles, upgrades and a finish.
+- **Design a new one.** The customer picks a design (paddle, oval, round or slim), a size, bristles, upgrades and a colour.
 
 ## Run it
 
@@ -26,7 +26,7 @@ You can't open `index.html` directly from the file system, because browsers bloc
 Everything you're likely to change is at the top of `app.js`:
 
 - `CONFIG.exo`: where the exoskeleton touches the brush, in mm in the STL's own axes: the inner faces of the top hook and the side hooks, the gap under the hook lips, and the handle joint. The reference brush size is worked out from these. If you change the STL in CAD, update these so the fitting and the preview line up.
-- `COLORS`, `FINISHES`, `DESIGNS`, `BRISTLES`, `UPGRADES`: the options people can pick.
+- `COLORS`, `DESIGNS`, `BRISTLES`, `UPGRADES`: the options people can pick.
 
 To swap in a new STL, replace `ExoSkeletonV5.STL` or change `CONFIG.stlPath`.
 

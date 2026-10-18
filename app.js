@@ -49,12 +49,6 @@ const COLORS = [
   { id: 'ivory', name: 'Ivory', hex: '#efe7d8' },
   { id: 'onyx', name: 'Onyx', hex: '#25252a' },
 ];
-const FINISHES = [
-  { id: 'matte', name: 'Matte', rough: 0.85, metal: 0, clear: 0 },
-  { id: 'satin', name: 'Satin', rough: 0.45, metal: 0, clear: 0.3 },
-  { id: 'gloss', name: 'Gloss', rough: 0.15, metal: 0, clear: 1 },
-  { id: 'metal', name: 'Metallic', rough: 0.3, metal: 0.85, clear: 0.5 },
-];
 const DESIGNS = [
   { id: 'paddle', name: 'Paddle', blurb: 'Wide, flat cushion for smoothing long hair.',
     dims: { length: 240, headLength: 110, headWidth: 84, handleWidth: 28, thickness: 12 } },
@@ -1290,7 +1284,7 @@ class EngravePart extends Part {
 }
 
 // The hanging hook from HangingHook.STL: its stub sits at the local origin and it points along +x,
-// so it's turned 180° to point out of the top end of the brush. It takes the body's colour and finish.
+// so it's turned 180° to point out of the top end of the brush. It takes the body's colour.
 class HookPart extends Part {
   constructor(p) {
     super(p, 'hang');
@@ -1322,7 +1316,7 @@ const state = {
   dims: { ...REF_START },
   design: 'paddle', size: 'm', bristle: 'nylon',
   upgrades: new Set(),
-  color: 'cobalt', finish: 'satin', engraving: '',
+  color: 'cobalt', engraving: '',
   ghost: true, showExo: true, explode: false, spin: true,
 };
 const cur = { dims: { ...REF_START }, explode: 0 };
@@ -1337,14 +1331,14 @@ const FLOWS = {
   existing: [
     { id: 'measure', title: 'Your brush', view: 'top' },
     { id: 'upgrades', title: 'Upgrades', view: 'overview' },
-    { id: 'finish', title: 'Finish', view: 'overview' },
+    { id: 'personalise', title: 'Personalise', view: 'overview' },
     { id: 'review', title: 'Review', view: 'overview' },
   ],
   new: [
     { id: 'design', title: 'Design', view: 'overview' },
     { id: 'bristles', title: 'Bristles', view: 'bristles' },
     { id: 'upgrades', title: 'Upgrades', view: 'overview' },
-    { id: 'finish', title: 'Finish', view: 'overview' },
+    { id: 'personalise', title: 'Personalise', view: 'overview' },
     { id: 'review', title: 'Review', view: 'overview' },
   ],
 };
@@ -1353,7 +1347,6 @@ const stepId = () => flow()[state.step]?.id ?? 'landing';
 const showDims = () => state.mode === 'existing' && stepId() === 'measure';
 const colorHex = () => COLORS.find((c) => c.id === state.color).hex;
 const accentHex = () => (state.color === 'coral' ? '#2f5bea' : '#ff6f59');
-const finish = () => FINISHES.find((f) => f.id === state.finish);
 
 function designDims() {
   const d = DESIGNS.find((x) => x.id === state.design).dims;
@@ -1370,7 +1363,7 @@ function summaryLines() {
     lines.push(BRISTLES.find((x) => x.id === state.bristle).name);
   }
   for (const u of UPGRADES) if (state.upgrades.has(u.id) && upgradeAvailable(u.id)) lines.push(u.id === 'handle' ? `${u.name}, ${state.dims.handleLength} mm, with pin` : u.name);
-  lines.push(`${COLORS.find((c) => c.id === state.color).name}, ${finish().name.toLowerCase()} finish`);
+  lines.push(`${COLORS.find((c) => c.id === state.color).name} colour`);
   if (state.engraving.trim()) lines.push(`Engraving “${state.engraving.trim()}”`);
   return lines;
 }
@@ -1403,7 +1396,7 @@ function swapProduct(next, { intro = 'drop' } = {}) {
   productRoot.add(next.group);
   next.update(cur.dims, 0);
   rootGoalX = -next.centerX();
-  applyFinish(false);
+  applyColor(false);
 
   if (intro === 'drop') {
     next.group.position.y = 110;
@@ -1451,19 +1444,16 @@ function syncParts({ stagger = false } = {}) {
   return added;
 }
 
-function applyFinish(animate = true) {
+function applyColor(animate = true) {
   if (!product) return;
-  const c = new THREE.Color(colorHex()), f = finish();
+  const c = new THREE.Color(colorHex());
   for (const m of product.bodyMaterials) {
-    if (!animate) { m.color.copy(c); m.roughness = f.rough; m.metalness = f.metal; m.clearcoat = f.clear; continue; }
-    const c0 = m.color.clone(), r0 = m.roughness, me0 = m.metalness, cl0 = m.clearcoat;
+    if (!animate) { m.color.copy(c); continue; }
+    const c0 = m.color.clone();
     tween({
       duration: 0.8, ease: ease.inOutCubic,
       onUpdate: (k) => {
         m.color.lerpColors(c0, c, k);
-        m.roughness = lerp(r0, f.rough, k);
-        m.metalness = lerp(me0, f.metal, k);
-        m.clearcoat = lerp(cl0, f.clear, k);
         m.emissive.copy(c).multiplyScalar(0.45 * Math.sin(k * Math.PI));
       },
     });
@@ -1596,7 +1586,7 @@ const VIEWS = {
       <button type="button" class="choice" data-mode="new" data-stagger>
         <span class="choice-icon">${ICONS.create}</span>
         <span class="choice-title">Design a new one</span>
-        <span class="choice-text">Pick a shape, bristles and finish, and we’ll build the whole brush for you.</span>
+        <span class="choice-text">Pick a shape, bristles and colour, and we’ll build the whole brush for you.</span>
       </button>
     </div>`,
 
@@ -1618,7 +1608,7 @@ const VIEWS = {
 
   design: () => `
     <h2 data-stagger>Choose a design</h2>
-    <p class="lede" data-stagger>Every design is printed in your colour and finish, then hand-assembled with your choice of bristles.</p>
+    <p class="lede" data-stagger>Every design is printed in your colour, then hand-assembled with your choice of bristles.</p>
     <div class="grid-2" role="radiogroup" aria-label="Design">
       ${DESIGNS.map((d) => `
         <button type="button" class="opt" role="radio" aria-checked="${state.design === d.id}" data-design="${d.id}" data-stagger>
@@ -1660,18 +1650,14 @@ const VIEWS = {
       }).join('')}
     </div>`,
 
-  finish: () => `
+  personalise: () => `
     <h2 data-stagger>Make it yours</h2>
-    <p class="lede" data-stagger>${state.mode === 'existing' ? 'Pick the colour and finish of your exoskeleton.' : 'Pick the colour and finish of the body.'}</p>
+    <p class="lede" data-stagger>${state.mode === 'existing' ? 'Pick the colour of your exoskeleton.' : 'Pick the colour of the body.'}</p>
     <h3 data-stagger>Colour</h3>
     <div class="swatches" role="radiogroup" aria-label="Colour" data-stagger>
       ${COLORS.map((c) => `<button type="button" class="swatch" role="radio" aria-checked="${state.color === c.id}" aria-label="${c.name}" title="${c.name}" style="--c:${c.hex}" data-color="${c.id}"></button>`).join('')}
     </div>
     <p class="swatch-name" id="swatch-name" data-stagger>${COLORS.find((c) => c.id === state.color).name}</p>
-    <h3 data-stagger>Finish</h3>
-    <div class="segmented" role="radiogroup" aria-label="Finish" data-stagger>
-      ${FINISHES.map((f) => `<button type="button" role="radio" aria-checked="${state.finish === f.id}" data-finish="${f.id}">${f.name}</button>`).join('')}
-    </div>
     <h3 data-stagger>Engraving</h3>
     <div data-stagger>
       <input class="text-input" id="engrave" maxlength="14" placeholder="A name or initials" value="${escapeHtml(state.engraving)}" autocomplete="off">
@@ -1826,17 +1812,12 @@ const BIND = {
     });
   },
 
-  finish() {
+  personalise() {
     panelBody.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => {
       state.color = b.dataset.color;
       panelBody.querySelectorAll('[data-color]').forEach((x) => x.setAttribute('aria-checked', x === b));
       $('#swatch-name').textContent = COLORS.find((c) => c.id === state.color).name;
-      applyFinish(true);
-    }));
-    panelBody.querySelectorAll('[data-finish]').forEach((b) => b.addEventListener('click', () => {
-      state.finish = b.dataset.finish;
-      panelBody.querySelectorAll('[data-finish]').forEach((x) => x.setAttribute('aria-checked', x === b));
-      applyFinish(true);
+      applyColor(true);
     }));
     const input = $('#engrave');
     let timer = null, focused = false;
@@ -1891,7 +1872,7 @@ function goStep(i) {
 function resetAll() {
   Object.assign(state, {
     mode: null, step: 0, dims: { ...REF_START }, design: 'paddle', size: 'm', bristle: 'nylon',
-    upgrades: new Set(), color: 'cobalt', finish: 'satin', engraving: '', ghost: true, showExo: true, explode: false,
+    upgrades: new Set(), color: 'cobalt', engraving: '', ghost: true, showExo: true, explode: false,
   });
   swapProduct(new ExistingProduct(stlGeometry), { intro: product ? 'drop' : 'scan' });
   renderPanel();
