@@ -36,9 +36,9 @@ To swap in a new STL, replace `ExoSkeletonV5.STL` or change `CONFIG.stlPath`.
 - `ExoSkeletonV2.STL`: one centred top hook instead of two.
 - `ExoSkeletonV3.STL`: 54% less material. The body is 3.2 mm thick instead of 7.6 mm, and the cross-arms are 6 mm wide instead of 12.7 mm. The faces the brush touches are unchanged, and the small 2D hook is removed.
 - `ExoSkeletonV4.STL`: V3 without the half-circle cradle. The end is 30 mm wide, with a solid 14 mm joint block and a Ø4.3 × 10.5 mm pin hole in its end face.
-- `ExoSkeletonV5.STL` (used by the app): V4 with a square socket instead of the round hole. The socket is 5 × 5 mm and 10 mm deep, centred in the 30 mm end face, and a Ø2.2 mm hole crosses it from side to side.
-- `Handle.STL`: a flat handle, 30 mm wide at the joint and 7.62 mm thick, tapering to 26 mm with a rounded tip, 110 mm long. A 4.8 × 4.8 × 9.8 mm square tenon sticks out of its joint face and slots into the socket (0.1 mm clearance per side), with the same Ø2.2 mm cross hole.
-- `Pin.STL`: a Ø2.0 × 30 mm locking pin with chamfered ends. It goes through the block and the tenon from the side and sits flush with both sides.
+- `ExoSkeletonV5.STL` (used by the app): V4 with a square socket instead of the round hole. The socket is 5 × 5 mm and 10 mm deep, centred in the 30 mm end face, and a Ø3.0 mm hole crosses it from side to side.
+- `Handle.STL`: a flat handle, 30 mm wide at the joint and 7.62 mm thick, tapering to 26 mm with a rounded tip, 110 mm long. A 4.8 × 4.8 × 9.8 mm square tenon sticks out of its joint face and slots into the socket (0.1 mm clearance per side), with the same Ø3.0 mm cross hole.
+- `Pin.STL`: a Ø2.8 × 30 mm locking pin with chamfered ends. It goes through the block and the tenon from the side and sits flush with both sides.
 - `HangingHook.STL`: that 2D hook as a separate part. It's the **Hanging hook** upgrade, and it's added to the fitted STL when chosen.
 
 ## How fitting works

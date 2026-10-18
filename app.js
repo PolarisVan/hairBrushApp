@@ -10,7 +10,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
    CONFIG — edit these to match your model and pricing
    ===================================================================== */
 const CONFIG = {
-  modelVersion: '5',         // bump after changing any STL so browsers don't reuse an old cached copy
+  modelVersion: '5.1',         // bump after changing any STL so browsers don't reuse an old cached copy
   stlPath: 'ExoSkeletonV5.STL',
   handlePath: 'Handle.STL',    // printed handle that pins onto the end of the exoskeleton
   pinPath: 'Pin.STL',          // locking pin across the joint (the handle's square tenon sits in the exo's square socket)
