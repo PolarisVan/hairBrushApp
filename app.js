@@ -10,10 +10,10 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
    CONFIG — edit these to match your model and pricing
    ===================================================================== */
 const CONFIG = {
-  modelVersion: '4.1',         // bump after changing any STL so browsers don't reuse an old cached copy
-  stlPath: 'ExoSkeletonV4.STL',
+  modelVersion: '5',         // bump after changing any STL so browsers don't reuse an old cached copy
+  stlPath: 'ExoSkeletonV5.STL',
   handlePath: 'Handle.STL',    // printed handle that pins onto the end of the exoskeleton
-  pinPath: 'Pin.STL',          // the small cylinder that joins them (both have a matching hole)
+  pinPath: 'Pin.STL',          // locking pin across the joint (the handle's square tenon sits in the exo's square socket)
   hookPath: 'HangingHook.STL', // the optional hanging hook (an upgrade), in its own frame
   // The exoskeleton fits the brush HEAD: the top hook takes the tip and the two side hooks take the
   // sides at the widest point. Its other end is 30 mm wide and joins the printed handle with a pin.
@@ -25,7 +25,7 @@ const CONFIG = {
     topHookX: 69.29,        // the top hook starts here
     armX: [-18.98, -12.98], // the cross-arms carrying the side hooks
     baseX: -60.71,          // the 30 mm wide end face where the handle pins on: the base of the head
-    jointBlock: 14,         // solid block behind that face holding the pin hole (kept rigid)
+    jointBlock: 14,         // solid block behind that face holding the square socket (kept rigid)
     sideHookZ: 44.46,       // inner face of each side hook: half the head width
     sideLipZ: 39.38,        // beyond this |z| the side hooks keep their shape
     plateHalfWidth: 15,     // half-width of the back plate
@@ -34,7 +34,7 @@ const CONFIG = {
     lipBottom: 10.67,       // ... and the hook lips close over its edge here
     jointY: 3.81,           // height of the pin's centre line
     handleLength: 110,      // length of Handle.STL as modelled ...
-    handleRigid: 15,        // ... of which this much at the joint (with the pin hole) never stretches
+    handleRigid: 15,        // ... of which this much at the joint (next to the square tenon) never stretches
     handleWidth: 30, handleThickness: 7.62,
     engraveH: 7,            // height of the engraving strip on the underside
     hookAt: [69.29, -13.55], // x, z where the hanging hook's stub meets the plate end (top end, to one side)
@@ -85,7 +85,7 @@ const ICONS = {
   create: '<svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8L18 21l-.8-2.4-2-.8 2-.8z"/></svg>',
 };
 const UPGRADES = [
-  { id: 'handle', name: 'Pin-on handle', blurb: 'A flat printed handle that pins onto the 30 mm end of the exoskeleton.', only: 'existing' },
+  { id: 'handle', name: 'Pin-on handle', blurb: 'A flat printed handle. Its square tenon slots into the 30 mm end of the exoskeleton and a pin locks it in.', only: 'existing' },
   { id: 'grip', name: 'Ergo grip sleeve', blurb: 'Soft-touch ribbed sleeve that stops the handle slipping.' },
   { id: 'mirror', name: 'Back mirror', blurb: 'Shatter-proof mirror set into the back of the head.' },
   { id: 'mount', name: 'Magnetic wall mount', blurb: 'A magnet in the handle end and a matching wall plate.' },
@@ -802,7 +802,7 @@ class Exo {
   }
 
   // Along x the joint block, the cross-arms and the top hook move as rigid blocks so the hooks and the
-  // pin hole keep their shape; the plate between them stretches. Head length sets the tip-to-joint
+  // square socket keep their shape; the plate between them stretches. Head length sets the tip-to-joint
   // distance, and the arms stay at the same fraction of the head (its widest point).
   knots(d) {
     const k = d.headLength / REF.headLength, c = (EXO.tipX + EXO.baseX) / 2;
@@ -980,14 +980,14 @@ class ExistingProduct {
     // the handle slides off the pin in the exploded view
     const shift = this.exo.jointShift(d);
     this.handle.update(d.handleLength, shift);
-    // added: the pin slides in over the first 40%, then the handle follows it with a little bounce
-    const h = this.handleLevel, kPin = ease.outCubic(clamp(h / 0.4, 0, 1)), kHandle = ease.outBack(clamp((h - 0.3) / 0.7, 0, 1));
-    this.handle.mesh.visible = h > 0.31;
+    // added: the handle's square tenon slides into the socket, then the locking pin goes in across the joint
+    const h = this.handleLevel, kHandle = ease.outCubic(clamp(h / 0.6, 0, 1)), kPin = ease.outBack(clamp((h - 0.55) / 0.45, 0, 1));
+    this.handle.mesh.visible = h > 0.001;
     this.brush.handleShow = 1 - clamp(h / 0.5, 0, 1);
     this.brush.setGhostOpacity(this.ghostLevel);
-    this.pin.visible = h > 0.001;
+    this.pin.visible = h > 0.56;
     this.handle.mesh.position.set(34 * this.explode + 90 * (1 - kHandle), -22 * this.explode, 0);
-    this.pin.position.set(-shift + 17 * this.explode + 40 * (1 - kPin), -22 * this.explode, 0);
+    this.pin.position.set(-shift + 17 * this.explode, -22 * this.explode, 26 * this.explode + 45 * (1 - kPin));
     this.jointX = -(EXO.baseX + shift); // scene x of the joint face
     this.handleEndX = this.jointX + d.handleLength;
     for (const id of EXO_MOUNTED) { const p = this.parts.get(id); if (p) p.group.visible = this.exoLevel > 0.5; }
