@@ -2,7 +2,7 @@
 
 An animated 3D configurator for two kinds of order:
 
-- **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV2.STL` reshapes live to fit them, and they add upgrades that clip onto it.
+- **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV3.STL` reshapes live to fit them, and they add upgrades that clip onto it.
 - **Design a new one.** The customer picks a design (paddle, oval, round or slim), a size, bristles, upgrades and a finish.
 
 ## Run it
@@ -28,7 +28,14 @@ Everything you're likely to change is at the top of `app.js`:
 - `CONFIG.exo`: where the exoskeleton touches the brush, in mm in the STL's own axes: the inner faces of the top hook, the side hooks and the C-cradle, and the gap under the hook lips. The reference brush size is worked out from these. If you change the STL in CAD, update these so the fitting and the preview line up.
 - `COLORS`, `FINISHES`, `DESIGNS`, `BRISTLES`, `UPGRADES`: options and prices.
 
-To swap in a new STL, replace `ExoSkeletonV2.STL` or change `CONFIG.stlPath`.
+To swap in a new STL, replace `ExoSkeletonV3.STL` or change `CONFIG.stlPath`.
+
+### Model versions
+
+- `ExoSkeletonV1.STL`: the original CAD export.
+- `ExoSkeletonV2.STL`: one centred top hook instead of two.
+- `ExoSkeletonV3.STL` (used by the app): 54% less material. The body is 3.2 mm thick instead of 7.6 mm, and the cross-arms are 6 mm wide instead of 12.7 mm. The faces the brush touches are unchanged, and the small 2D hook is removed.
+- `HangingHook.STL`: that 2D hook as a separate part. It's the **Hanging hook** upgrade, and it's added to the fitted STL when chosen.
 
 ## How fitting works
 
