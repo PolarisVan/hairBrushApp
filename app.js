@@ -271,9 +271,12 @@ const mirrorTexture = (() => {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 })();
-const PIN_GEO = keep(new THREE.CylinderGeometry(1, 1, 1, 6).translate(0, 0.5, 0));
-const TUFT_GEO = keep(new THREE.CylinderGeometry(0.8, 1, 1, 7).translate(0, 0.5, 0));
-const TIP_GEO = keep(new THREE.SphereGeometry(1, 10, 8));
+// unit-height parts, base at y = 0, scaled per instance
+const PIN_GEO = keep(new THREE.CylinderGeometry(0.72, 1, 1, 10, 1, true).translate(0, 0.5, 0));  // tapers to the tip
+const GHOST_PIN_GEO = keep(new THREE.CylinderGeometry(1, 1, 1, 6).translate(0, 0.5, 0));
+const BOOT_GEO = keep(new THREE.CylinderGeometry(0.62, 1, 1, 14).translate(0, 0.5, 0));            // rubber grommet at the pin's base
+const STRAND_GEO = keep(new THREE.CylinderGeometry(0.45, 1, 1, 4, 1, true).translate(0, 0.5, 0)); // one boar hair
+const TIP_GEO = keep(new THREE.SphereGeometry(1, 14, 10));
 
 function disposeTree(obj) {
   obj.traverse((o) => {
@@ -412,10 +415,21 @@ function handleShape(x0, x1, wNeck, w) {
 }
 
 /* =====================================================================
-   Bristles: instanced pins / tufts / ball tips with a ripple grow animation
+   Bristles: nylon pins (tapered, in rubber boots, with ball tips) and boar tufts (bundles of fine
+   splayed hairs), instanced, with a ripple grow animation
    ===================================================================== */
-const MAX_BRISTLES = 1800;
+const MAX_PINS = 2400;
+const STRANDS_PER_TUFT = 24;
+const MAX_STRANDS = 14400;
 const _m = new THREE.Matrix4(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _q2 = new THREE.Quaternion(), _v = new THREE.Vector3();
+
+// unit vectors perpendicular to d
+function basisFor(d) {
+  const t = Math.abs(d.y) < 0.9 ? UP : V3(1, 0, 0);
+  const u = V3().crossVectors(d, t).normalize();
+  return [u, V3().crossVectors(d, u).normalize()];
+}
 
 class BristleField {
   constructor(ghost) {
@@ -423,16 +437,19 @@ class BristleField {
     this.group = new THREE.Group();
     this.pinMat = ghost
       ? new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.5, depthWrite: false, roughness: 0.3 })
-      : new THREE.MeshStandardMaterial({ color: '#2a2a31', roughness: 0.45 });
-    this.tuftMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 });
-    this.tipMat = new THREE.MeshStandardMaterial({ color: '#f5f1e8', roughness: 0.3 });
-    this.pins = new THREE.InstancedMesh(PIN_GEO, this.pinMat, MAX_BRISTLES);
-    this.tufts = new THREE.InstancedMesh(TUFT_GEO, this.tuftMat, MAX_BRISTLES);
-    this.tips = new THREE.InstancedMesh(TIP_GEO, this.tipMat, MAX_BRISTLES);
-    for (const m of [this.pins, this.tufts, this.tips]) {
+      : new THREE.MeshPhysicalMaterial({ color: '#1f1f25', roughness: 0.32, clearcoat: 0.6, clearcoatRoughness: 0.3, side: THREE.DoubleSide });
+    this.bootMat = new THREE.MeshStandardMaterial({ color: '#18181c', roughness: 0.85 });
+    this.tipMat = new THREE.MeshPhysicalMaterial({ color: '#ffffff', roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.15 });
+    this.strandMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.75, side: THREE.DoubleSide });
+    this.pins = new THREE.InstancedMesh(ghost ? GHOST_PIN_GEO : PIN_GEO, this.pinMat, MAX_PINS);
+    this.boots = new THREE.InstancedMesh(BOOT_GEO, this.bootMat, MAX_PINS);
+    this.tips = new THREE.InstancedMesh(TIP_GEO, this.tipMat, MAX_PINS);
+    this.strands = new THREE.InstancedMesh(STRAND_GEO, this.strandMat, MAX_STRANDS);
+    this.meshes = [this.pins, this.boots, this.tips, this.strands];
+    for (const m of this.meshes) {
       m.count = 0;
       m.frustumCulled = false;
-      m.castShadow = !ghost;
+      m.castShadow = !ghost && m !== this.tips;
       this.group.add(m);
     }
     this.items = [];
@@ -446,24 +463,47 @@ class BristleField {
   // points: [{ p, d, lenMul, wave }]
   setLayout(points, baseLen, type) {
     const items = [];
-    const tuftColA = new THREE.Color('#dcc29c'), tuftColB = new THREE.Color('#9c7650');
+    const boar = [new THREE.Color('#efe2c6'), new THREE.Color('#cfae7f'), new THREE.Color('#9b7349'), new THREE.Color('#5e4128')];
+    const tipA = new THREE.Color('#fbf8f1'), tipB = new THREE.Color('#e4dccd');
+    let nStrand = 0, nTip = 0;
     points.forEach((pt, i) => {
-      let kind = 'pin', len = baseLen * (pt.lenMul ?? 1), tip = !this.ghost;
-      if (this.ghost) tip = false;
-      else if (type === 'boar') { kind = 'tuft'; len *= 0.72; tip = false; }
-      else if (type === 'mixed' && i % 3 !== 0) { kind = 'tuft'; len *= 0.74; tip = false; }
-      else if (type === 'mixed') len *= 1.08;
-      items.push({
-        p: pt.p, d: pt.d, q: new THREE.Quaternion().setFromUnitVectors(UP, pt.d), len, kind, tip,
-        delay: pt.wave * 0.75 + hash(i) * 0.12,
-        color: kind === 'tuft' ? tuftColA.clone().lerp(tuftColB, hash(i * 3.1)) : null,
-      });
+      let kind = 'pin', len = baseLen * (pt.lenMul ?? 1);
+      if (!this.ghost && (type === 'boar' || (type === 'mixed' && i % 3 !== 0))) { kind = 'tuft'; len *= 0.74; }
+      else if (type === 'mixed') len *= 1.1;
+      const [u, w] = basisFor(pt.d);
+      const it = { p: pt.p, d: pt.d, len, kind, delay: pt.wave * 0.75 + hash(i) * 0.12 };
+      if (kind === 'pin') {
+        // each pin leans a few degrees in its own direction, and lengths vary a little
+        const lean = this.ghost ? 0 : 0.035 + hash(i * 7.3) * 0.045, az = hash(i * 2.9) * Math.PI * 2;
+        const dir = pt.d.clone().addScaledVector(u, Math.cos(az) * lean).addScaledVector(w, Math.sin(az) * lean).normalize();
+        it.dir = dir;
+        it.q = new THREE.Quaternion().setFromUnitVectors(UP, dir);
+        it.qBase = new THREE.Quaternion().setFromUnitVectors(UP, pt.d);
+        it.len *= this.ghost ? 1 : 0.95 + hash(i * 5.1) * 0.08;
+        if (!this.ghost) this.tips.setColorAt(nTip++, tipA.clone().lerp(tipB, hash(i * 1.7)));
+      } else {
+        // a tuft: fine hairs from a tight base that fan out, with ragged ends and mixed natural colours
+        it.strands = [];
+        for (let k = 0; k < STRANDS_PER_TUFT && nStrand < MAX_STRANDS; k++, nStrand++) {
+          const hk = hash(i * 31.7 + k * 3.3), ang = (k / STRANDS_PER_TUFT) * Math.PI * 2 + hk * 0.9;
+          const ring = Math.sqrt(hash(i * 13.1 + k * 7.7)) * 0.95; // 0 at the centre of the tuft, 1 at its edge
+          const radial = u.clone().multiplyScalar(Math.cos(ang)).addScaledVector(w, Math.sin(ang));
+          const dir = pt.d.clone().addScaledVector(radial, 0.05 + ring * 0.2 + hash(k * 9.1 + i) * 0.04).normalize();
+          it.strands.push({
+            off: radial.clone().multiplyScalar(ring * 1.05),
+            q: new THREE.Quaternion().setFromUnitVectors(UP, dir),
+            len: 0.82 + hash(i * 3.7 + k * 1.3) * 0.22,
+            r: 0.15 + hash(i + k * 5.5) * 0.06,
+          });
+          const c0 = boar[Math.floor(hash(i * 2.2 + k * 0.7) * 3)], c1 = boar[Math.floor(hash(i * 4.4 + k * 1.9) * 3) + 1];
+          this.strands.setColorAt(nStrand, c0.clone().lerp(c1, hash(k * 17.3 + i * 0.3)));
+        }
+      }
+      items.push(it);
     });
     this.items = items;
     this.maxDelay = items.reduce((m, it) => Math.max(m, it.delay), 0);
-    let t = 0;
-    for (const it of items) if (it.kind === 'tuft') this.tufts.setColorAt(t++, it.color);
-    if (this.tufts.instanceColor) this.tufts.instanceColor.needsUpdate = true;
+    for (const m of [this.tips, this.strands]) if (m.instanceColor) m.instanceColor.needsUpdate = true;
     this.dirty = true;
   }
 
@@ -479,22 +519,40 @@ class BristleField {
 
   update() {
     if (this.mode === 'idle' && !this.dirty) return;
-    let np = 0, nt = 0, nx = 0;
+    let np = 0, ns = 0;
+    const real = !this.ghost;
     for (const it of this.items) {
-      const g = this.growthOf(it);
-      const r = it.kind === 'pin' ? (this.ghost ? 0.5 : 0.6) : 1.3;
-      _s.set(r, Math.max(0.001, it.len * g), r);
-      _m.compose(it.p, it.q, _s);
-      if (it.kind === 'pin') this.pins.setMatrixAt(np++, _m); else this.tufts.setMatrixAt(nt++, _m);
-      if (it.tip) {
-        _p.copy(it.d).multiplyScalar(it.len * g).add(it.p);
-        _s.setScalar(1.25 * clamp(g, 0.001, 1.15));
-        _m.compose(_p, _q.identity(), _s);
-        this.tips.setMatrixAt(nx++, _m);
+      const g = this.growthOf(it), L = Math.max(0.001, it.len * g);
+      if (it.kind === 'pin') {
+        const r = real ? 0.62 : 0.5;
+        _s.set(r, L, r);
+        _m.compose(it.p, it.q, _s);
+        this.pins.setMatrixAt(np, _m);
+        if (real) {
+          const bs = clamp(g, 0.001, 1);
+          _s.set(1.7 * bs, 1.4 * bs, 1.7 * bs);
+          _m.compose(it.p, it.qBase, _s);
+          this.boots.setMatrixAt(np, _m);
+          _p.copy(it.dir).multiplyScalar(L).add(it.p);
+          const ts = 1.15 * clamp(g, 0.001, 1.15);
+          _s.set(ts, ts * 0.86, ts);
+          _m.compose(_p, it.q, _s);
+          this.tips.setMatrixAt(np, _m);
+        }
+        np++;
+      } else {
+        for (const st of it.strands) {
+          _p.copy(st.off).multiplyScalar(clamp(g, 0, 1)).add(it.p);
+          _s.set(st.r, L * st.len, st.r);
+          _m.compose(_p, st.q, _s);
+          this.strands.setMatrixAt(ns++, _m);
+        }
       }
     }
-    this.pins.count = np; this.tufts.count = nt; this.tips.count = nx;
-    for (const m of [this.pins, this.tufts, this.tips]) m.instanceMatrix.needsUpdate = true;
+    this.pins.count = np;
+    this.boots.count = this.tips.count = real ? np : 0;
+    this.strands.count = ns;
+    for (const m of this.meshes) m.instanceMatrix.needsUpdate = true;
     this.dirty = false;
 
     const span = this.mode === 'grow' ? this.maxDelay + 0.55 : this.maxDelay * 0.35 + 0.3;
