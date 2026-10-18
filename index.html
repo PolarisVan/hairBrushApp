@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrushLab — made-to-measure hairbrushes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="viewport"></div>
+
+  <header class="topbar">
+    <button class="brand" id="brand" type="button" title="Start over">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><rect x="3" y="9" width="15" height="14" rx="5"/><path d="M17 14h9a2 2 0 0 1 0 4h-9z"/><path d="M6 9V5M9.5 9V4M13 9V5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
+      </span>
+      <span class="brand-name">BrushLab</span>
+    </button>
+    <nav class="stepper" id="stepper" aria-label="Progress"></nav>
+  </header>
+
+  <aside class="panel" id="panel">
+    <div class="panel-body" id="panel-body"></div>
+    <footer class="panel-foot" id="panel-foot">
+      <button class="btn btn-quiet" id="back" type="button">Back</button>
+      <div class="price">
+        <span class="price-label">Total</span>
+        <span class="price-value" id="price">$0</span>
+      </div>
+      <button class="btn btn-primary" id="next" type="button">Next</button>
+    </footer>
+  </aside>
+
+  <div class="hud">
+    <button class="hud-btn" id="recenter" type="button" title="Reset view" aria-label="Reset view">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+    </button>
+    <button class="hud-btn" id="spin" type="button" title="Auto-spin" aria-label="Auto-spin" aria-pressed="true">
+      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/></svg>
+    </button>
+    <span class="hud-hint">Drag to rotate · scroll to zoom</span>
+  </div>
+
+  <div class="loader" id="loader">
+    <div class="loader-ring"></div>
+    <p id="loader-text">Loading your model…</p>
+  </div>
+
+  <div class="modal" id="modal" hidden></div>
+
+  <script>
+    // Browsers block loading modules and the STL from file://, so point people at the local server.
+    if (location.protocol === 'file:') {
+      document.getElementById('loader-text').innerHTML =
+        'This page needs to run from a local server.<br>Double-click <b>start.bat</b> in the project folder, then open <b>http://localhost:5173</b>.';
+      document.getElementById('loader').classList.add('is-error');
+    }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
