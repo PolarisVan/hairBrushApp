@@ -1661,7 +1661,7 @@ const VIEWS = {
     <h3 data-stagger>Engraving</h3>
     <div data-stagger>
       <input class="text-input" id="engrave" maxlength="14" placeholder="A name or initials" value="${escapeHtml(state.engraving)}" autocomplete="off">
-      <div class="counter"><span>${state.mode === 'existing' ? 'Laser-engraved on the back plate' : 'Laser-engraved on the handle'}</span><span id="engrave-count">${state.engraving.length}/14</span></div>
+      <div class="counter"><span>${state.mode === 'existing' ? '3D-printed on the back plate' : '3D-printed on the handle'}</span><span id="engrave-count">${state.engraving.length}/14</span></div>
     </div>`,
 
   review: () => `
