@@ -26,7 +26,7 @@ You can't open `index.html` directly from the file system, because browsers bloc
 Everything you're likely to change is at the top of `app.js`:
 
 - `CONFIG.exo`: where the exoskeleton touches the brush, in mm in the STL's own axes: the inner faces of the top hook and the side hooks, the gap under the hook lips, and the handle joint. The reference brush size is worked out from these. If you change the STL in CAD, update these so the fitting and the preview line up.
-- `COLORS`, `FINISHES`, `DESIGNS`, `BRISTLES`, `UPGRADES`: options and prices.
+- `COLORS`, `FINISHES`, `DESIGNS`, `BRISTLES`, `UPGRADES`: the options people can pick.
 
 To swap in a new STL, replace `ExoSkeletonV4.STL` or change `CONFIG.stlPath`.
 

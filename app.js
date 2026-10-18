@@ -14,7 +14,6 @@ const CONFIG = {
   handlePath: 'Handle.STL',    // printed handle that pins onto the end of the exoskeleton
   pinPath: 'Pin.STL',          // the small cylinder that joins them (both have a matching hole)
   hookPath: 'HangingHook.STL', // the optional hanging hook (an upgrade), in its own frame
-  currency: '$',
   // The exoskeleton fits the brush HEAD: the top hook takes the tip and the two side hooks take the
   // sides at the widest point. Its other end is 30 mm wide and joins the printed handle with a pin.
   // Landmarks are in the STL's own axes, measured from `origin` (mm): x along the length with the
@@ -39,8 +38,6 @@ const CONFIG = {
     engraveH: 7,            // height of the engraving strip on the underside
     hookAt: [69.29, -13.55], // x, z where the hanging hook's stub meets the plate end (top end, to one side)
   },
-  basePrice: 24,
-  engravingPrice: 5,
 };
 
 const COLORS = [
@@ -52,30 +49,30 @@ const COLORS = [
   { id: 'onyx', name: 'Onyx', hex: '#25252a' },
 ];
 const FINISHES = [
-  { id: 'matte', name: 'Matte', rough: 0.85, metal: 0, clear: 0, price: 0 },
-  { id: 'satin', name: 'Satin', rough: 0.45, metal: 0, clear: 0.3, price: 0 },
-  { id: 'gloss', name: 'Gloss', rough: 0.15, metal: 0, clear: 1, price: 2 },
-  { id: 'metal', name: 'Metallic', rough: 0.3, metal: 0.85, clear: 0.5, price: 4 },
+  { id: 'matte', name: 'Matte', rough: 0.85, metal: 0, clear: 0 },
+  { id: 'satin', name: 'Satin', rough: 0.45, metal: 0, clear: 0.3 },
+  { id: 'gloss', name: 'Gloss', rough: 0.15, metal: 0, clear: 1 },
+  { id: 'metal', name: 'Metallic', rough: 0.3, metal: 0.85, clear: 0.5 },
 ];
 const DESIGNS = [
-  { id: 'paddle', name: 'Paddle', blurb: 'Wide, flat cushion for smoothing long hair.', price: 39,
+  { id: 'paddle', name: 'Paddle', blurb: 'Wide, flat cushion for smoothing long hair.',
     dims: { length: 240, headLength: 110, headWidth: 84, handleWidth: 28, thickness: 12 } },
-  { id: 'oval', name: 'Oval cushion', blurb: 'An everyday all-rounder with a softer footprint.', price: 36,
+  { id: 'oval', name: 'Oval cushion', blurb: 'An everyday all-rounder with a softer footprint.',
     dims: { length: 220, headLength: 96, headWidth: 66, handleWidth: 26, thickness: 13 } },
-  { id: 'round', name: 'Round thermal', blurb: 'Aluminium barrel for volume and blow-outs.', price: 42,
+  { id: 'round', name: 'Round thermal', blurb: 'Aluminium barrel for volume and blow-outs.',
     dims: { length: 250, headLength: 110, headWidth: 56, handleWidth: 24, thickness: 12 } },
-  { id: 'slim', name: 'Slim detangler', blurb: 'Narrow and light, with staggered pins that glide through knots.', price: 34,
+  { id: 'slim', name: 'Slim detangler', blurb: 'Narrow and light, with staggered pins that glide through knots.',
     dims: { length: 215, headLength: 100, headWidth: 46, handleWidth: 22, thickness: 10 } },
 ];
 const SIZES = [
-  { id: 's', name: 'Compact', note: '−12%', k: 0.88, price: 0 },
-  { id: 'm', name: 'Standard', note: 'as shown', k: 1, price: 0 },
-  { id: 'l', name: 'Large', note: '+10%', k: 1.1, price: 4 },
+  { id: 's', name: 'Compact', note: '−12%', k: 0.88 },
+  { id: 'm', name: 'Standard', note: 'as shown', k: 1 },
+  { id: 'l', name: 'Large', note: '+10%', k: 1.1 },
 ];
 const BRISTLES = [
-  { id: 'nylon', name: 'Nylon ball-tip', blurb: 'Flexible pins with rounded tips that are gentle on the scalp.', price: 0 },
-  { id: 'boar', name: 'Boar tufts', blurb: 'Dense natural tufts that spread oils for shine.', price: 8 },
-  { id: 'mixed', name: 'Boar + nylon', blurb: 'Tufts for shine, taller pins for detangling.', price: 5 },
+  { id: 'nylon', name: 'Nylon ball-tip', blurb: 'Flexible pins with rounded tips that are gentle on the scalp.' },
+  { id: 'boar', name: 'Boar tufts', blurb: 'Dense natural tufts that spread oils for shine.' },
+  { id: 'mixed', name: 'Boar + nylon', blurb: 'Tufts for shine, taller pins for detangling.' },
 ];
 const ICONS = {
   grip: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="4"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>',
@@ -86,10 +83,10 @@ const ICONS = {
   create: '<svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8L18 21l-.8-2.4-2-.8 2-.8z"/></svg>',
 };
 const UPGRADES = [
-  { id: 'grip', name: 'Ergo grip sleeve', blurb: 'Soft-touch ribbed sleeve that stops the handle slipping.', price: 9 },
-  { id: 'mirror', name: 'Back mirror', blurb: 'Shatter-proof mirror set into the back of the head.', price: 7 },
-  { id: 'mount', name: 'Magnetic wall mount', blurb: 'A magnet in the handle end and a matching wall plate.', price: 6 },
-  { id: 'hang', name: 'Hanging hook', blurb: 'A small printed hook at the top so the brush hangs on a peg.', price: 3 },
+  { id: 'grip', name: 'Ergo grip sleeve', blurb: 'Soft-touch ribbed sleeve that stops the handle slipping.' },
+  { id: 'mirror', name: 'Back mirror', blurb: 'Shatter-proof mirror set into the back of the head.' },
+  { id: 'mount', name: 'Magnetic wall mount', blurb: 'A magnet in the handle end and a matching wall plate.' },
+  { id: 'hang', name: 'Hanging hook', blurb: 'A small printed hook at the top so the brush hangs on a peg.' },
 ];
 const DIM_FIELDS = [
   { key: 'headLength', label: 'Head length', min: 70, max: 180, hint: 'Tip of the head to where it meets the handle. Sets where the top hook and the handle joint sit.' },
@@ -1272,7 +1269,6 @@ const showDims = () => state.mode === 'existing' && stepId() === 'measure';
 const colorHex = () => COLORS.find((c) => c.id === state.color).hex;
 const accentHex = () => (state.color === 'coral' ? '#2f5bea' : '#ff6f59');
 const finish = () => FINISHES.find((f) => f.id === state.finish);
-const money = (v) => `${CONFIG.currency}${v}`;
 
 function designDims() {
   const d = DESIGNS.find((x) => x.id === state.design).dims;
@@ -1280,25 +1276,19 @@ function designDims() {
   return Object.fromEntries(DIM_KEYS.map((key) => [key, Math.round((d[key] ?? REF[key]) * (key === 'thickness' ? 1 : k))]));
 }
 
-function priceLines() {
+function summaryLines() {
   const lines = [];
   if (state.mode === 'existing') {
-    lines.push(['Custom-fit exoskeleton', CONFIG.basePrice]);
+    lines.push('Custom-fit exoskeleton, handle and pin');
   } else {
-    const d = DESIGNS.find((x) => x.id === state.design);
-    lines.push([`${d.name} brush`, d.price]);
-    const s = SIZES.find((x) => x.id === state.size);
-    if (s.price) lines.push([`${s.name} size`, s.price]);
-    const b = BRISTLES.find((x) => x.id === state.bristle);
-    lines.push([b.name, b.price]);
+    lines.push(`${DESIGNS.find((x) => x.id === state.design).name} brush, ${SIZES.find((x) => x.id === state.size).name.toLowerCase()} size`);
+    lines.push(BRISTLES.find((x) => x.id === state.bristle).name);
   }
-  for (const u of UPGRADES) if (state.upgrades.has(u.id) && upgradeAvailable(u.id)) lines.push([u.name, u.price]);
-  const f = finish();
-  lines.push([`${COLORS.find((c) => c.id === state.color).name}, ${f.name.toLowerCase()} finish`, f.price]);
-  if (state.engraving.trim()) lines.push([`Engraving “${state.engraving.trim()}”`, CONFIG.engravingPrice]);
+  for (const u of UPGRADES) if (state.upgrades.has(u.id) && upgradeAvailable(u.id)) lines.push(u.name);
+  lines.push(`${COLORS.find((c) => c.id === state.color).name}, ${finish().name.toLowerCase()} finish`);
+  if (state.engraving.trim()) lines.push(`Engraving “${state.engraving.trim()}”`);
   return lines;
 }
-const total = () => priceLines().reduce((s, l) => s + l[1], 0);
 const upgradeAvailable = (id) => !(id === 'mirror' && state.mode === 'new' && state.design === 'round');
 
 /* =====================================================================
@@ -1458,20 +1448,6 @@ controls.addEventListener('start', () => {
 const $ = (s, el = document) => el.querySelector(s);
 const panelBody = $('#panel-body');
 const panelFoot = $('#panel-foot');
-const priceEl = $('#price');
-let shownPrice = 0, priceTween = null;
-
-function updatePrice() {
-  const to = total();
-  if (to === shownPrice) return;
-  const from = shownPrice;
-  shownPrice = to;
-  cancel(priceTween);
-  priceTween = tween({ duration: 0.6, ease: ease.outCubic, onUpdate: (k) => { priceEl.textContent = money(Math.round(lerp(from, to, k))); } });
-  priceEl.classList.remove('bump');
-  void priceEl.offsetWidth;
-  priceEl.classList.add('bump');
-}
 
 function renderStepper() {
   const el = $('#stepper');
@@ -1502,7 +1478,6 @@ function renderPanel() {
   $('#next').classList.toggle('is-accent', last);
   BIND[id]?.();
   renderStepper();
-  updatePrice();
   const exoBtn = $('#exo-toggle');
   exoBtn.hidden = state.mode !== 'existing';
   exoBtn.setAttribute('aria-pressed', state.showExo);
@@ -1526,13 +1501,11 @@ const VIEWS = {
         <span class="choice-icon">${ICONS.upgrade}</span>
         <span class="choice-title">Upgrade my brush</span>
         <span class="choice-text">Enter your brush’s measurements and we’ll print an exoskeleton that clips onto it, with any upgrades you want.</span>
-        <span class="choice-meta">From ${money(CONFIG.basePrice)}</span>
       </button>
       <button type="button" class="choice" data-mode="new" data-stagger>
         <span class="choice-icon">${ICONS.create}</span>
         <span class="choice-title">Design a new one</span>
         <span class="choice-text">Pick a shape, bristles and finish, and we’ll build the whole brush for you.</span>
-        <span class="choice-meta">From ${money(Math.min(...DESIGNS.map((d) => d.price)))}</span>
       </button>
     </div>`,
 
@@ -1561,12 +1534,11 @@ const VIEWS = {
           <span class="opt-art">${DESIGN_ART[d.id]}</span>
           <span class="opt-title">${d.name}</span>
           <span class="opt-text">${d.blurb}</span>
-          <span class="opt-price">${money(d.price)}</span>
         </button>`).join('')}
     </div>
     <h3 data-stagger>Size</h3>
     <div class="segmented" role="radiogroup" aria-label="Size" data-stagger>
-      ${SIZES.map((s) => `<button type="button" role="radio" aria-checked="${state.size === s.id}" data-size="${s.id}">${s.name}<small>${s.price ? '+' + money(s.price) : s.note}</small></button>`).join('')}
+      ${SIZES.map((s) => `<button type="button" role="radio" aria-checked="${state.size === s.id}" data-size="${s.id}">${s.name}<small>${s.note}</small></button>`).join('')}
     </div>`,
 
   bristles: () => `
@@ -1577,7 +1549,6 @@ const VIEWS = {
         <button type="button" class="opt" role="radio" aria-checked="${state.bristle === b.id}" data-bristle="${b.id}" data-stagger>
           <span class="opt-title">${b.name}</span>
           <span class="opt-text">${b.blurb}</span>
-          <span class="opt-price">${b.price ? '+' + money(b.price) : 'Included'}</span>
         </button>`).join('')}
     </div>`,
 
@@ -1591,7 +1562,7 @@ const VIEWS = {
         <button type="button" class="opt" aria-pressed="${ok && state.upgrades.has(u.id)}" data-upgrade="${u.id}" ${ok ? '' : 'disabled'} data-stagger>
           <span class="opt-row">
             <span class="opt-icon">${ICONS[u.id]}</span>
-            <span><span class="opt-title">${u.name}</span><span class="opt-text">${ok ? u.blurb : 'Not available on a round brush.'}</span><span class="opt-price">+${money(u.price)}</span></span>
+            <span><span class="opt-title">${u.name}</span><span class="opt-text">${ok ? u.blurb : 'Not available on a round brush.'}</span></span>
             <span class="check"><svg viewBox="0 0 16 16"><path d="M3 8.5l3.2 3L13 4.5"/></svg></span>
           </span>
         </button>`;
@@ -1608,9 +1579,9 @@ const VIEWS = {
     <p class="swatch-name" id="swatch-name" data-stagger>${COLORS.find((c) => c.id === state.color).name}</p>
     <h3 data-stagger>Finish</h3>
     <div class="segmented" role="radiogroup" aria-label="Finish" data-stagger>
-      ${FINISHES.map((f) => `<button type="button" role="radio" aria-checked="${state.finish === f.id}" data-finish="${f.id}">${f.name}<small>${f.price ? '+' + money(f.price) : 'Included'}</small></button>`).join('')}
+      ${FINISHES.map((f) => `<button type="button" role="radio" aria-checked="${state.finish === f.id}" data-finish="${f.id}">${f.name}</button>`).join('')}
     </div>
-    <h3 data-stagger>Engraving <span style="text-transform:none;letter-spacing:0;font-weight:600">· +${money(CONFIG.engravingPrice)}</span></h3>
+    <h3 data-stagger>Engraving</h3>
     <div data-stagger>
       <input class="text-input" id="engrave" maxlength="14" placeholder="A name or initials" value="${escapeHtml(state.engraving)}" autocomplete="off">
       <div class="counter"><span>${state.mode === 'existing' ? 'Laser-engraved on the back plate' : 'Laser-engraved on the handle'}</span><span id="engrave-count">${state.engraving.length}/14</span></div>
@@ -1622,8 +1593,7 @@ const VIEWS = {
       ? `An exoskeleton fitted to your ${state.dims.headLength} × ${state.dims.headWidth} mm brush head, with a ${state.dims.handleLength} mm handle pinned onto its end.`
       : `${DESIGNS.find((d) => d.id === state.design).name}, ${SIZES.find((s) => s.id === state.size).name.toLowerCase()} size, ${state.dims.length} mm long.`}</p>
     <ul class="lines" data-stagger>
-      ${priceLines().map(([n, p]) => `<li><span>${escapeHtml(n)}</span><span>${p ? money(p) : '—'}</span></li>`).join('')}
-      <li class="total"><span>Total</span><span>${money(total())}</span></li>
+      ${summaryLines().map((n) => `<li><span>${escapeHtml(n)}</span></li>`).join('')}
     </ul>
     <div class="actions" data-stagger>
       <button type="button" class="btn btn-outline" id="explode" aria-pressed="${state.explode}">Exploded view</button>
@@ -1703,14 +1673,12 @@ const BIND = {
       swapProduct(new NewProduct(state.design, state.bristle));
       panelBody.querySelectorAll('[data-design]').forEach((x) => x.setAttribute('aria-checked', x === b));
       tween({ delay: 0.3, duration: 0.001, onComplete: () => flyTo('overview') });
-      updatePrice();
     }));
     panelBody.querySelectorAll('[data-size]').forEach((b) => b.addEventListener('click', () => {
       state.size = b.dataset.size;
       state.dims = designDims();
       panelBody.querySelectorAll('[data-size]').forEach((x) => x.setAttribute('aria-checked', x === b));
       tween({ delay: 0.2, duration: 0.001, onComplete: () => flyTo('overview') });
-      updatePrice();
     }));
   },
 
@@ -1720,7 +1688,6 @@ const BIND = {
       product.brush.setBristle(state.bristle);
       panelBody.querySelectorAll('[data-bristle]').forEach((x) => x.setAttribute('aria-checked', x === b));
       flyTo('bristles', 1);
-      updatePrice();
     }));
   },
 
@@ -1733,7 +1700,6 @@ const BIND = {
       const added = syncParts();
       if (on && added[0]) flyTo(added[0].view(product.anchors()), 1.2);
       else flyTo('overview', 1.2);
-      updatePrice();
     }));
   },
 
@@ -1743,13 +1709,11 @@ const BIND = {
       panelBody.querySelectorAll('[data-color]').forEach((x) => x.setAttribute('aria-checked', x === b));
       $('#swatch-name').textContent = COLORS.find((c) => c.id === state.color).name;
       applyFinish(true);
-      updatePrice();
     }));
     panelBody.querySelectorAll('[data-finish]').forEach((b) => b.addEventListener('click', () => {
       state.finish = b.dataset.finish;
       panelBody.querySelectorAll('[data-finish]').forEach((x) => x.setAttribute('aria-checked', x === b));
       applyFinish(true);
-      updatePrice();
     }));
     const input = $('#engrave');
     let timer = null, focused = false;
@@ -1765,7 +1729,6 @@ const BIND = {
         const part = product.parts.get('engrave');
         if (part && !focused) { flyTo(part.view(product.anchors()), 1.2); focused = true; }
         if (!part) { focused = false; flyTo('overview'); }
-        updatePrice();
       }, 380);
     });
   },
@@ -1807,7 +1770,6 @@ function resetAll() {
     mode: null, step: 0, dims: { ...REF_START }, design: 'paddle', size: 'm', bristle: 'nylon',
     upgrades: new Set(), color: 'cobalt', finish: 'satin', engraving: '', ghost: true, showExo: true, explode: false,
   });
-  shownPrice = 0;
   swapProduct(new ExistingProduct(stlGeometry), { intro: product ? 'drop' : 'scan' });
   renderPanel();
   flyToStep();
@@ -1831,7 +1793,7 @@ function placeOrder() {
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="order-title">
       <svg class="success" viewBox="0 0 76 76"><circle cx="38" cy="38" r="35"/><path d="M24 39l9 9 19-20"/></svg>
       <h2 id="order-title">Order placed</h2>
-      <p>Order <span class="order-no">${no}</span> · ${money(total())}</p>
+      <p>Order <span class="order-no">${no}</span></p>
       <p>We’ll print, finish and ship your brush within 5 working days.</p>
       <button type="button" class="btn btn-primary" id="again">Start another</button>
     </div>`;

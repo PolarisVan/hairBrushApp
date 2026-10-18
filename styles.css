@@ -103,11 +103,7 @@ button { font: inherit; color: inherit; }
   background: rgba(255, 255, 255, .55);
 }
 .panel-foot[hidden] { display: none; }
-.price { flex: 1; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
-.price-label { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
-.price-value { font-family: var(--serif); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.price-value.bump { animation: bump .45s cubic-bezier(.34, 1.56, .64, 1); }
-@keyframes bump { 40% { transform: scale(1.12); color: var(--accent-ink); } }
+.foot-spacer { flex: 1; }
 
 .btn {
   border: 0; cursor: pointer; border-radius: 14px;
