@@ -14,14 +14,14 @@ const CONFIG = {
   currency: '$',
   // The brush the exoskeleton STL was modelled around (mm). User inputs scale the STL relative to this.
   referenceBrush: { length: 230, headLength: 100, headWidth: 80, handleWidth: 28, thickness: 12 },
-  // Landmarks on the STL once it is centred (mm). x runs along the length (head side is −x),
+  // Landmarks on the STL in its own axes, once centred (mm). x runs along the length,
   // y is up from the bottom of the back plate (the brush sits on the +y side).
   exo: {
-    armX: -15,        // centre of the cross-arms that clip around the brush head
-    neckStart: 13,    // where the plate narrows from head width ...
-    neckEnd: 34,      // ... to handle width
+    headEnd: '+x',    // end the brush head sits at: '+x' = the hanging-loop end, '-x' = the C-cradle end
+    headX: 60,        // centre of the brush head along x
+    neck: [13, 34],   // stretch where the plate changes from head width to handle width
     plateTop: 7.6,    // top face of the back plate (the brush rests here)
-    mirrorX: -40,     // where the back mirror sits under the head plate
+    mirrorX: 58,      // where the back mirror sits under the head
     engraveX: 33, engraveLen: 60, engraveH: 7, // engraving strip on the underside
   },
   basePrice: 24,
@@ -89,6 +89,17 @@ const DESIGN_ART = {
 };
 
 const REF = CONFIG.referenceBrush;
+// Internally the head is always on −x; an STL whose head end is +x is turned 180° on load.
+const EXO_FLIP = CONFIG.exo.headEnd === '+x';
+const exoIn = (x) => (EXO_FLIP ? -x : x);
+const EXO = {
+  ...CONFIG.exo,
+  headX: exoIn(CONFIG.exo.headX),
+  neckStart: Math.min(exoIn(CONFIG.exo.neck[0]), exoIn(CONFIG.exo.neck[1])),
+  neckEnd: Math.max(exoIn(CONFIG.exo.neck[0]), exoIn(CONFIG.exo.neck[1])),
+  mirrorX: exoIn(CONFIG.exo.mirrorX),
+  engraveX: exoIn(CONFIG.exo.engraveX),
+};
 const DIM_KEYS = Object.keys(REF);
 const UP = new THREE.Vector3(0, 1, 0);
 const V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -653,6 +664,7 @@ class Exo {
     g.computeBoundingBox();
     const bb = g.boundingBox;
     g.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
+    if (EXO_FLIP) g.rotateY(Math.PI);
     g.deleteAttribute('normal');
     g.computeVertexNormals();
     this.halfLen = (bb.max.x - bb.min.x) / 2;
@@ -676,11 +688,11 @@ class Exo {
   // Head side stretches with head length, handle side with total length; width blends from head to
   // handle across the neck; only the hooks above the plate grow with thickness.
   deformInto(geom, d) {
-    const s = this.scales(d), E = CONFIG.exo, o = this.orig, pos = geom.attributes.position.array;
+    const s = this.scales(d), E = EXO, o = this.orig, pos = geom.attributes.position.array;
     const ky = lerp(1, s.y, 0.7);
     for (let i = 0; i < o.length; i += 3) {
       const x = o[i], y = o[i + 1], z = o[i + 2];
-      pos[i] = x < 0 ? x * s.head : x * s.total;
+      pos[i] = this.mapX(x, s);
       pos[i + 1] = y <= E.plateTop ? y : E.plateTop + (y - E.plateTop) * ky;
       pos[i + 2] = z * lerp(s.zHead, s.zHandle, smoothstep(E.neckStart, E.neckEnd, x));
     }
@@ -689,6 +701,9 @@ class Exo {
     geom.computeBoundingBox();
     geom.computeBoundingSphere();
   }
+
+  // Head side (−x) stretches with head length, handle side with total length.
+  mapX(x, s) { return x < 0 ? x * s.head : x * s.total; }
 
   deform(d) {
     if (this.last && dimsClose(this.last, d, 0.05)) return;
@@ -772,8 +787,8 @@ class ExistingProduct {
     this.brush.update(d);
     const b = this.brush.info, s = this.exo.scales(d);
     this.s = s;
-    this.bx = CONFIG.exo.armX * s.head - b.Lh / 2;
-    this.by = CONFIG.exo.plateTop;
+    this.bx = this.exo.mapX(EXO.headX, s) - b.Lh / 2;
+    this.by = EXO.plateTop;
     this.brush.group.position.set(this.bx, this.by + 20 * this.explode, 0);
     this.exo.mesh.position.y = -22 * this.explode;
     this.dimsLevel = damp(this.dimsLevel, showDims() ? 1 : 0, 8, dt);
@@ -798,7 +813,7 @@ class ExistingProduct {
   }
 
   anchors() {
-    const b = this.brush.info, s = this.s, E = CONFIG.exo, bx = this.bx, by = this.by;
+    const b = this.brush.info, s = this.s, E = EXO, bx = this.bx, by = this.by;
     const [xmin, xmax] = this.extentX();
     const exoEnd = this.exo.halfLen * s.total;
     const x1 = bx + b.endX - 8;
@@ -810,8 +825,8 @@ class ExistingProduct {
       center: V3((xmin + xmax) / 2, by + b.T * 0.5 + 6, 0),
       head: V3(bx + b.Lh / 2, by + b.bristleTop * 0.6, 0),
       handle: { x0, x1, y: by + b.handleY, w: b.Wd, t: b.Th },
-      back: { pos: V3(E.mirrorX * s.head, -0.5, 0), rx: mr, rz: mr },
-      engrave: { pos: V3(E.engraveX * s.total, -0.35, 0), w: E.engraveLen * s.total, h: E.engraveH * s.zHandle, up: false },
+      back: { pos: V3(this.exo.mapX(E.mirrorX, s), -0.5, 0), rx: mr, rz: mr },
+      engrave: { pos: V3(this.exo.mapX(E.engraveX, s), -0.35, 0), w: E.engraveLen * (E.engraveX < 0 ? s.head : s.total), h: E.engraveH * s.zHandle, up: false },
       end: V3(bx + b.endX, by + b.handleY, 0),
     };
   }
@@ -1674,6 +1689,7 @@ function placeOrder() {
 function downloadFittedSTL() {
   const geom = product.exo.geom.clone();
   product.exo.deformInto(geom, state.dims);
+  if (EXO_FLIP) geom.rotateY(Math.PI); // back to the STL's original orientation
   const data = new STLExporter().parse(new THREE.Mesh(geom), { binary: true });
   geom.dispose();
   const url = URL.createObjectURL(new Blob([data], { type: 'model/stl' }));
