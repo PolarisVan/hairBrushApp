@@ -78,11 +78,13 @@ const ICONS = {
   grip: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8" rx="4"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>',
   mirror: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8.5 10.5l3-3M9.5 14l5-5"/></svg>',
   mount: '<svg viewBox="0 0 24 24"><path d="M6 4v8a6 6 0 0 0 12 0V4"/><path d="M6 8h3M15 8h3"/></svg>',
+  handle: '<svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="1"/><path d="M10 12h2"/><rect x="12" y="9" width="10" height="6" rx="3"/></svg>',
   hang: '<svg viewBox="0 0 24 24"><path d="M12 3v7"/><path d="M12 10a5 5 0 1 0 5 5"/><circle cx="12" cy="3" r="1"/></svg>',
   upgrade: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="9" height="14" rx="3"/><path d="M13 12h7"/><path d="M17 3l2 2-2 2M19 5h-4"/></svg>',
   create: '<svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z"/><path d="M18 15l.8 2 2 .8-2 .8L18 21l-.8-2.4-2-.8 2-.8z"/></svg>',
 };
 const UPGRADES = [
+  { id: 'handle', name: 'Pin-on handle', blurb: 'A flat printed handle that pins onto the 30 mm end of the exoskeleton.', only: 'existing' },
   { id: 'grip', name: 'Ergo grip sleeve', blurb: 'Soft-touch ribbed sleeve that stops the handle slipping.' },
   { id: 'mirror', name: 'Back mirror', blurb: 'Shatter-proof mirror set into the back of the head.' },
   { id: 'mount', name: 'Magnetic wall mount', blurb: 'A magnet in the handle end and a matching wall plate.' },
@@ -92,8 +94,11 @@ const DIM_FIELDS = [
   { key: 'headLength', label: 'Head length', min: 70, max: 180, hint: 'Tip of the head to where it meets the handle. Sets where the top hook and the handle joint sit.' },
   { key: 'headWidth', label: 'Head width', min: 45, max: 120, hint: 'Widest point across the head. The side hooks clip on here.' },
   { key: 'thickness', label: 'Head edge thickness', min: 1, max: 15, hint: 'How thick the rim of the head is where the hook lips close over it.' },
-  { key: 'handleLength', label: 'Handle length', min: 70, max: 180, hint: 'Length of the printed handle that pins onto the 30 mm end of the exoskeleton.' },
 ];
+// Set on the Upgrades step once the pin-on handle is added.
+const HANDLE_FIELD = { key: 'handleLength', label: 'Handle length', min: 70, max: 180 };
+// Upgrades that sit on the pin-on handle, so they need it on the exoskeleton.
+const ON_HANDLE = ['grip', 'mount'];
 const DESIGN_ART = {
   paddle: '<svg viewBox="0 0 120 40"><rect x="3" y="3" width="50" height="34" rx="11"/><path d="M50 15c9 0 11 2 20 2h41a3 3 0 0 1 0 6H70c-9 0-11 2-20 2z"/></svg>',
   oval: '<svg viewBox="0 0 120 40"><ellipse cx="27" cy="20" rx="24" ry="15"/><path d="M48 16c8 0 10 1.5 20 1.5h43a2.5 2.5 0 0 1 0 5H68c-10 0-12 1.5-20 1.5z"/></svg>',
@@ -849,6 +854,8 @@ class ExistingProduct {
     this.pin.geometry.computeVertexNormals();
     this.pin.rotation.y = Math.PI; // scene axes are the STL turned 180° about y
     this.group.add(this.handle.mesh, this.pin);
+    this.handleLevel = 0;
+    this.handle.mesh.visible = this.pin.visible = false;
     this.brush.group.renderOrder = 2;
     this.group.add(this.brush.group);
     this.ghostLevel = 0;
@@ -888,6 +895,17 @@ class ExistingProduct {
     });
   }
 
+  // Slide the pin into the joint, then the handle onto it.
+  setHandle(on) {
+    cancel(this.handleTween);
+    const from = this.handleLevel;
+    this.handleTween = tween({
+      duration: on ? 1.1 : 0.5, ease: on ? ease.linear : ease.inCubic,
+      onUpdate: (k) => { this.handleLevel = lerp(from, on ? 1 : 0, k); },
+      onComplete: () => { if (on) burst(V3(this.jointX, EXO.jointY, 0).add(this.group.getWorldPosition(V3())), accentHex(), 28, 40); },
+    });
+  }
+
   update(d, dt) {
     this.d = d;
     this.exo.deform(d);
@@ -900,8 +918,12 @@ class ExistingProduct {
     // the handle slides off the pin in the exploded view
     const shift = this.exo.jointShift(d);
     this.handle.update(d.handleLength, shift);
-    this.handle.mesh.position.set(34 * this.explode, -22 * this.explode, 0);
-    this.pin.position.set(-shift + 17 * this.explode, -22 * this.explode, 0);
+    // added: the pin slides in over the first 40%, then the handle follows it with a little bounce
+    const h = this.handleLevel, kPin = ease.outCubic(clamp(h / 0.4, 0, 1)), kHandle = ease.outBack(clamp((h - 0.3) / 0.7, 0, 1));
+    this.handle.mesh.visible = h > 0.31;
+    this.pin.visible = h > 0.001;
+    this.handle.mesh.position.set(34 * this.explode + 90 * (1 - kHandle), -22 * this.explode, 0);
+    this.pin.position.set(-shift + 17 * this.explode + 40 * (1 - kPin), -22 * this.explode, 0);
     this.jointX = -(EXO.baseX + shift); // scene x of the joint face
     this.handleEndX = this.jointX + d.handleLength;
     for (const id of EXO_MOUNTED) { const p = this.parts.get(id); if (p) p.group.visible = this.exoLevel > 0.5; }
@@ -912,7 +934,6 @@ class ExistingProduct {
   updateDims(b) {
     const o = this.dimsLevel, bx = this.bx, by = this.by, L = this.dimLines;
     const zf = EXO.handleWidth / 2 + 10, top = by + b.T;
-    L.handleLength.set(V3(this.jointX, EXO.jointY, zf), V3(this.handleEndX, EXO.jointY, zf), V3(0, 0, 1), this.d.handleLength, o);
     L.headLength.set(V3(bx, top, -(b.Wh / 2 + 10)), V3(bx + b.Lh, top, -(b.Wh / 2 + 10)), V3(0, 0, -1), b.Lh, o);
     L.headWidth.set(V3(bx - 12, top, -b.Wh / 2), V3(bx - 12, top, b.Wh / 2), V3(-1, 0, 0), b.Wh, o);
     L.thickness.set(V3(bx + b.Lh * 0.5, by, b.Wh / 2 + 4), V3(bx + b.Lh * 0.5, top, b.Wh / 2 + 4), V3(0, 0, 1), this.d.thickness, o);
@@ -920,7 +941,7 @@ class ExistingProduct {
 
   extentX() {
     const hi = this.exo.bounds[1];
-    return [Math.min(this.exo.xAt(hi, this.d), this.bx), this.handleEndX];
+    return [Math.min(this.exo.xAt(hi, this.d), this.bx), state.upgrades.has('handle') ? this.handleEndX : this.jointX];
   }
 
   anchors() {
@@ -1279,17 +1300,23 @@ function designDims() {
 function summaryLines() {
   const lines = [];
   if (state.mode === 'existing') {
-    lines.push('Custom-fit exoskeleton, handle and pin');
+    lines.push('Custom-fit exoskeleton');
   } else {
     lines.push(`${DESIGNS.find((x) => x.id === state.design).name} brush, ${SIZES.find((x) => x.id === state.size).name.toLowerCase()} size`);
     lines.push(BRISTLES.find((x) => x.id === state.bristle).name);
   }
-  for (const u of UPGRADES) if (state.upgrades.has(u.id) && upgradeAvailable(u.id)) lines.push(u.name);
+  for (const u of UPGRADES) if (state.upgrades.has(u.id) && upgradeAvailable(u.id)) lines.push(u.id === 'handle' ? `${u.name}, ${state.dims.handleLength} mm, with pin` : u.name);
   lines.push(`${COLORS.find((c) => c.id === state.color).name}, ${finish().name.toLowerCase()} finish`);
   if (state.engraving.trim()) lines.push(`Engraving “${state.engraving.trim()}”`);
   return lines;
 }
-const upgradeAvailable = (id) => !(id === 'mirror' && state.mode === 'new' && state.design === 'round');
+const upgradeShown = (u) => !u.only || u.only === state.mode;
+function upgradeBlocked(id) {
+  if (id === 'mirror' && state.mode === 'new' && state.design === 'round') return 'Not available on a round brush.';
+  if (state.mode === 'existing' && ON_HANDLE.includes(id) && !state.upgrades.has('handle')) return 'Add the pin-on handle first.';
+  return null;
+}
+const upgradeAvailable = (id) => !upgradeBlocked(id) && upgradeShown(UPGRADES.find((u) => u.id === id));
 
 /* =====================================================================
    Product orchestration
@@ -1337,7 +1364,7 @@ function swapProduct(next, { intro = 'drop' } = {}) {
 }
 
 function wantedParts() {
-  const want = new Set([...state.upgrades].filter(upgradeAvailable));
+  const want = new Set([...state.upgrades].filter((id) => id !== 'handle' && upgradeAvailable(id)));
   if (state.engraving.trim()) want.add('engrave');
   return want;
 }
@@ -1556,16 +1583,16 @@ const VIEWS = {
     <h2 data-stagger>Add upgrades</h2>
     <p class="lede" data-stagger>${state.mode === 'existing' ? 'These attach to your exoskeleton.' : 'Built straight into your new brush.'} Tap one to see it fitted.</p>
     <div class="stack">
-      ${UPGRADES.map((u) => {
-        const ok = upgradeAvailable(u.id);
+      ${UPGRADES.filter(upgradeShown).map((u) => {
+        const why = upgradeBlocked(u.id);
         return `
-        <button type="button" class="opt" aria-pressed="${ok && state.upgrades.has(u.id)}" data-upgrade="${u.id}" ${ok ? '' : 'disabled'} data-stagger>
+        <button type="button" class="opt" aria-pressed="${!why && state.upgrades.has(u.id)}" data-upgrade="${u.id}" ${why ? 'disabled' : ''} data-stagger>
           <span class="opt-row">
             <span class="opt-icon">${ICONS[u.id]}</span>
-            <span><span class="opt-title">${u.name}</span><span class="opt-text">${ok ? u.blurb : 'Not available on a round brush.'}</span></span>
+            <span><span class="opt-title">${u.name}</span><span class="opt-text">${why || u.blurb}</span></span>
             <span class="check"><svg viewBox="0 0 16 16"><path d="M3 8.5l3.2 3L13 4.5"/></svg></span>
           </span>
-        </button>`;
+        </button>${u.id === 'handle' && state.upgrades.has('handle') ? handleLengthField() : ''}`;
       }).join('')}
     </div>`,
 
@@ -1590,7 +1617,7 @@ const VIEWS = {
   review: () => `
     <h2 data-stagger>Review your brush</h2>
     <p class="lede" data-stagger>${state.mode === 'existing'
-      ? `An exoskeleton fitted to your ${state.dims.headLength} × ${state.dims.headWidth} mm brush head, with a ${state.dims.handleLength} mm handle pinned onto its end.`
+      ? `An exoskeleton fitted to your ${state.dims.headLength} × ${state.dims.headWidth} mm brush head${state.upgrades.has('handle') ? `, with a ${state.dims.handleLength} mm handle pinned onto its end` : ''}.`
       : `${DESIGNS.find((d) => d.id === state.design).name}, ${SIZES.find((s) => s.id === state.size).name.toLowerCase()} size, ${state.dims.length} mm long.`}</p>
     <ul class="lines" data-stagger>
       ${summaryLines().map((n) => `<li><span>${escapeHtml(n)}</span></li>`).join('')}
@@ -1599,8 +1626,20 @@ const VIEWS = {
       <button type="button" class="btn btn-outline" id="explode" aria-pressed="${state.explode}">Exploded view</button>
       ${state.mode === 'existing' ? '<button type="button" class="btn btn-outline" id="download">Download STL</button>' : ''}
     </div>
-    ${state.mode === 'existing' ? '<p class="note" data-stagger>One file with three parts laid out for printing: the exoskeleton fitted to these measurements, the handle, and the pin that joins them. Check clearances before printing.</p>' : ''}`,
+    ${state.mode === 'existing' ? `<p class="note" data-stagger>${state.upgrades.has('handle') ? 'One file with three parts laid out for printing: the exoskeleton fitted to these measurements, the handle, and the pin that joins them.' : 'The exoskeleton fitted to these measurements.'} Check clearances before printing.</p>` : ''}`,
 };
+
+function handleLengthField() {
+  const f = HANDLE_FIELD, v = state.dims.handleLength;
+  return `
+        <div class="field sub-field" data-stagger>
+          <div class="field-top">
+            <label for="dim-handleLength">${f.label}</label>
+            <div class="num"><input id="dim-handleLength" type="number" inputmode="numeric" min="${f.min}" max="${f.max}" value="${v}" data-key="handleLength"><span>mm</span></div>
+          </div>
+          <input type="range" min="${f.min}" max="${f.max}" step="1" value="${v}" data-key="handleLength" aria-label="${f.label}">
+        </div>`;
+}
 
 function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
@@ -1615,7 +1654,6 @@ function renderFit() {
     <span class="fit-title">Exoskeleton fitted</span>
     <span class="fit-chip">head length <b>${pct(d.headLength, REF.headLength)}</b></span>
     <span class="fit-chip">head width <b>${pct(d.headWidth, REF.headWidth)}</b></span>
-    <span class="fit-chip">handle <b>${d.handleLength} mm</b></span>
     <span class="fit-chip">lip gap <b>${d.thickness} mm</b></span>`;
 }
 
@@ -1696,11 +1734,32 @@ const BIND = {
       const id = b.dataset.upgrade;
       const on = !state.upgrades.has(id);
       if (on) state.upgrades.add(id); else state.upgrades.delete(id);
+      if (id === 'handle') {
+        // the grip and the wall mount sit on the handle, so they go with it
+        if (!on) ON_HANDLE.forEach((x) => state.upgrades.delete(x));
+        syncParts();
+        product.setHandle(on);
+        renderPanel(); // shows the length slider and unlocks the upgrades that need the handle
+        flyTo('overview', 1.2);
+        return;
+      }
       b.setAttribute('aria-pressed', on);
       const added = syncParts();
       if (on && added[0]) flyTo(added[0].view(product.anchors()), 1.2);
       else flyTo('overview', 1.2);
     }));
+    const inputs = panelBody.querySelectorAll('input[data-key="handleLength"]');
+    const setLen = (v, from) => {
+      state.dims.handleLength = clamp(Math.round(+v || 0), HANDLE_FIELD.min, HANDLE_FIELD.max);
+      inputs.forEach((el) => { if (el !== from) el.value = state.dims.handleLength; if (el.type === 'range') setRangeFill(el); });
+      clearTimeout(reframeTimer);
+      reframeTimer = setTimeout(() => stepId() === 'upgrades' && flyTo('overview', 1.1), 600);
+    };
+    inputs.forEach((el) => {
+      if (el.type === 'range') setRangeFill(el);
+      el.addEventListener('input', () => { if (el.type === 'range' || (+el.value >= HANDLE_FIELD.min && +el.value <= HANDLE_FIELD.max)) setLen(el.value, el); });
+      el.addEventListener('change', () => { setLen(el.value); el.value = state.dims.handleLength; });
+    });
   },
 
   finish() {
@@ -1850,7 +1909,9 @@ async function downloadFittedSTL() {
     bodies.push(Array.from(hook.attributes.position.array));
     hook.dispose();
   }
-  // ... then the handle and the pin, laid out beside it on the print bed instead of assembled
+  // ... then the handle and the pin if they were added, laid out beside it on the print bed
+  const loose = [];
+  if (state.upgrades.has('handle')) {
   const handle = product.handle.geom.clone();
   product.handle.deformInto(handle, d.handleLength, shift, true);
   const pin = toLandmarkFrame(pinGeometry);
@@ -1858,11 +1919,12 @@ async function downloadFittedSTL() {
   const eb = geom.boundingBox, hb = handle.boundingBox, pb = pin.boundingBox;
   handle.translate(eb.min.x - hb.min.x, 0, eb.min.z - 6 - hb.max.z);
   pin.translate(eb.min.x - pb.min.x, -pb.min.y, eb.min.z - 6 - (hb.max.z - hb.min.z) - 6 - pb.max.z);
-  const loose = [Array.from(handle.attributes.position.array), Array.from(pin.attributes.position.array)];
+  loose.push(Array.from(handle.attributes.position.array), Array.from(pin.attributes.position.array));
   handle.dispose(); pin.dispose();
+  }
   let solid;
   try {
-    solid = await unionBodies([...bodies, ...loose]); // one file, three separate parts
+    solid = await unionBodies([...bodies, ...loose]); // one file, separate parts
   } catch (err) {
     // Without the library, keep the overlapping bodies: slicers merge them when printing.
     console.warn('Could not merge the parts into one solid:', err);

@@ -2,7 +2,7 @@
 
 An animated 3D configurator for two kinds of order:
 
-- **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV4.STL` reshapes live to fit the brush head, a printed handle pins onto its end, and they add upgrades.
+- **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV4.STL` reshapes live to fit the brush head. It starts on its own; a printed handle that pins onto its end is one of the upgrades.
 - **Design a new one.** The customer picks a design (paddle, oval, round or slim), a size, bristles, upgrades and a finish.
 
 ## Run it
@@ -47,7 +47,7 @@ The exoskeleton only fits the brush **head**. Each measurement moves the part th
 - **Head length** sets the distance from the top hook (the tip of the head) to the 30 mm joint end (the base of the head). The cross-arms stay at the head's widest point, and the plate in between stretches.
 - **Head width** slides the side hooks out or in so their inner faces meet the sides of the head.
 - **Head edge thickness** raises or lowers every hook lip so the gap under it matches the rim.
-- **Handle length** stretches the printed handle. Its first 15 mm at the joint, with the pin hole, never stretches.
+- **Handle length** (on the Upgrades step, once the pin-on handle is added) stretches the printed handle. Its first 15 mm at the joint, with the pin hole, never stretches.
 - The joint block and the pin hole move with the base of the head and never stretch.
 
-On the Review step, **Download STL** exports one file with the three parts laid out side by side for printing: the fitted exoskeleton (with the hanging hook if chosen), the handle and the pin. Check clearances before printing.
+On the Review step, **Download STL** exports one file with the three parts laid out side by side for printing: the fitted exoskeleton (with the hanging hook if chosen), plus the handle and the pin if the pin-on handle was added. Check clearances before printing.
