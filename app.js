@@ -10,7 +10,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
    CONFIG — edit these to match your model and pricing
    ===================================================================== */
 const CONFIG = {
-  stlPath: 'ExoSkeletonV3.STL',
+  stlPath: 'ExoSkeletonV3_split.STL', // ExoSkeletonV3 as two overlapping bodies: plate + C-cradle
   hookPath: 'HangingHook.STL', // the optional hanging hook (an upgrade), in its own frame
   currency: '$',
   // The exoskeleton only fits the brush HEAD: the top hook takes the tip, the two side hooks take
@@ -25,7 +25,8 @@ const CONFIG = {
     sideHookZ: 44.46,       // inner face of each side hook: half the head width
     sideLipZ: 39.38,        // beyond this |z| the side hooks keep their shape
     plateHalfWidth: 15,     // half-width of the back plate
-    cradleHalfWidth: 12.45, // half-width of the C-cradle: half the handle width
+    cradleCenterY: 13.23,   // the C-cradle is a half circle around the handle: its centre height ...
+    cradleRadius: 10.16,    // ... and inner radius (half the handle width)
     plateBottom: 4.42,      // underside of the back plate
     plateTop: 7.62,         // the head rests on this face ...
     lipBottom: 10.67,       // ... and the hook lips close over its edge here
@@ -105,7 +106,7 @@ const REF = {
   length: EXO.totalLength,
   headLength: EXO.tipX - EXO.baseX,
   headWidth: 2 * EXO.sideHookZ,
-  handleWidth: 2 * EXO.cradleHalfWidth,
+  handleWidth: 2 * EXO.cradleRadius,
   thickness: EXO.lipBottom - EXO.plateTop,
 };
 const REF_START = Object.fromEntries(Object.entries(REF).map(([k, v]) => [k, Math.round(v)]));
@@ -553,14 +554,31 @@ class BrushModel {
     head.translate(Lh / 2, 0, 0);
     this.addMesh(head, this.bodyMat);
 
-    const Th = Math.max(5, T * 0.8);
-    const hb = Math.min(2, Th / 4);
+    let Th = Math.max(5, T * 0.8), hy = Math.max(0, (T - Th) / 2); // a thin head mustn't push the handle below its back
     const neckX = Lh - 10;
-    const { shape, neck } = handleShape(neckX, L - hb, Math.min(Wd * 0.75, Wh * 0.6), Wd);
-    const handle = slab(shape, Th, hb);
-    const hy = Math.max(0, (T - Th) / 2); // a thin head mustn't push the handle below its back
-    handle.translate(0, hy, 0);
-    this.addMesh(handle, this.bodyMat);
+    let neck;
+    if (this.handleAxisY != null) {
+      // Round handle (the user's own brush): full width by the time it reaches the cradle at x = Lh.
+      const R = Wd / 2, x0 = Lh - 12, len = L - x0, pts = [];
+      for (let i = 0; i <= 48; i++) {
+        const u = (i / 48) * len, x = x0 + u;
+        let r = R * lerp(0.4, 1, smoothstep(x0, Lh, x));
+        if (u > len - 6) r *= Math.sqrt(Math.max(0, 1 - ((u - (len - 6)) / 6) ** 2));
+        pts.push(new THREE.Vector2(Math.max(r, 0.01), u));
+      }
+      const handle = new THREE.LatheGeometry(pts, 40).rotateZ(-Math.PI / 2).translate(x0, this.handleAxisY, 0);
+      this.addMesh(handle, this.bodyMat);
+      Th = Wd;
+      hy = this.handleAxisY - R;
+      neck = Lh + 18 - neckX; // grip starts past the cradle
+    } else {
+      const hb = Math.min(2, Th / 4);
+      const hs = handleShape(neckX, L - hb, Math.min(Wd * 0.75, Wh * 0.6), Wd);
+      neck = hs.neck;
+      const handle = slab(hs.shape, Th, hb);
+      handle.translate(0, hy, 0);
+      this.addMesh(handle, this.bodyMat);
+    }
 
     let brBase = T;
     if (st.pad && !this.ghost) {
@@ -668,6 +686,24 @@ class BrushModel {
 /* =====================================================================
    The imported STL exoskeleton, deformed to fit the user's measurements
    ===================================================================== */
+// The model file holds two overlapping closed bodies: the plate and the C-cradle. Flags the vertices of
+// the cradle (the body that reaches the lowest x) so it can be resized on its own.
+function cradleVertices(pos) {
+  const n = pos.length / 3, parent = new Int32Array(n).map((_, i) => i), seen = new Map();
+  const find = (a) => { while (parent[a] !== a) a = parent[a] = parent[parent[a]]; return a; };
+  const join = (a, b) => { parent[find(a)] = find(b); };
+  for (let i = 0; i < n; i++) {
+    const k = `${pos[i * 3].toFixed(3)},${pos[i * 3 + 1].toFixed(3)},${pos[i * 3 + 2].toFixed(3)}`;
+    if (seen.has(k)) join(i, seen.get(k)); else seen.set(k, i);
+  }
+  for (let t = 0; t < n; t += 3) { join(t, t + 1); join(t, t + 2); } // non-indexed: 3 vertices per triangle
+  let lowest = 0;
+  for (let i = 1; i < n; i++) if (pos[i * 3] < pos[lowest * 3]) lowest = i;
+  const root = find(lowest), mask = new Uint8Array(n);
+  for (let i = 0; i < n; i++) mask[i] = find(i) === root ? 1 : 0;
+  return mask;
+}
+
 class Exo {
   constructor(src) {
     const g = src.clone();
@@ -676,6 +712,7 @@ class Exo {
     g.translate(-cx, -bb.min.y, -cz);
     this.bounds = [bb.min.x - cx, bb.max.x - cx];
     this.orig = g.attributes.position.array.slice(); // STL axes, centred
+    this.cradleMask = cradleVertices(this.orig);
     g.deleteAttribute('normal');
     this.geom = g;
     this.material = makeBodyMat();
@@ -712,13 +749,19 @@ class Exo {
     const K = this.knots(d), o = this.orig, pos = geom.attributes.position.array;
     const dz = d.headWidth / 2 - EXO.sideHookZ; // side hooks slide out to the head width
     const zArm = (EXO.sideLipZ + dz - EXO.plateHalfWidth) / (EXO.sideLipZ - EXO.plateHalfWidth);
-    const kCradle = d.handleWidth / REF.handleWidth; // cradle widens with the handle
+    // The cradle radius follows the handle with the wall thickness kept. Its bottom stays on the plate,
+    // so a thicker handle makes it grow upwards rather than pulling it away from the plate.
+    const dR = d.handleWidth / 2 - EXO.cradleRadius, cy = EXO.cradleCenterY;
+    const sBase = K.ys[1] - K.xs[1]; // the cradle moves with the base of the head as one block
     const kGap = d.thickness / REF.thickness, dGap = d.thickness - REF.thickness; // lips clear the head's edge
     for (let i = 0; i < o.length; i += 3) {
       const x = o[i], y = o[i + 1], z = o[i + 2];
       let X = this.mapX(x, K), Y = y, Z = z;
-      if (x < EXO.baseX + 0.01) {
-        Z = z * kCradle;
+      if (this.cradleMask[i / 3]) {
+        const dy = y - cy, r = Math.hypot(z, dy), k = r > 1e-6 ? (r + dR) / r : 1;
+        X = x + sBase;
+        Z = z * k;
+        Y = cy + dR + dy * k;
       } else {
         const az = Math.abs(z);
         if (az > EXO.plateHalfWidth) {
@@ -738,6 +781,9 @@ class Exo {
 
   // A landmark's x (STL axes) -> x in the scene, for the given measurements.
   xAt(xStl, d) { return -this.mapX(xStl, this.knots(d)); }
+
+  // Height of the handle's centre line above the plate's resting face (it sits in the cradle).
+  handleAxis(d) { return EXO.cradleCenterY + d.handleWidth / 2 - EXO.cradleRadius - EXO.plateTop; }
 
   deform(d) {
     if (this.last && dimsClose(this.last, d, 0.05)) return;
@@ -796,6 +842,7 @@ class ExistingProduct {
     this.exo = new Exo(stl);
     this.group.add(this.exo.mesh);
     this.brush = new BrushModel('ghost', { ghost: true });
+    this.brush.handleAxisY = this.exo.handleAxis(REF); // the handle runs through the middle of the cradle
     this.brush.group.renderOrder = 2;
     this.group.add(this.brush.group);
     this.ghostLevel = 0;
@@ -838,6 +885,7 @@ class ExistingProduct {
   update(d, dt) {
     this.d = d;
     this.exo.deform(d);
+    this.brush.handleAxisY = this.exo.handleAxis(d);
     this.brush.update(d);
     const b = this.brush.info;
     this.bx = this.exo.xAt(EXO.tipX, d); // the head tip sits against the top hook
@@ -1784,19 +1832,66 @@ function placeOrder() {
   [0, 0.25, 0.5].forEach((d, i) => tween({ delay: d + 0.3, duration: 0.001, onComplete: () => burst(c.clone().add(V3((i - 1) * 60, 20, 0)), [accentHex(), colorHex(), '#ffd36b'][i], 40, 80) }));
 }
 
-function downloadFittedSTL() {
+// Solid-modelling library, loaded only when someone downloads, to merge the parts into one solid.
+let manifoldLib = null;
+async function loadManifold() {
+  if (!manifoldLib) {
+    manifoldLib = import('https://cdn.jsdelivr.net/npm/manifold-3d@3.0.0/manifold.js')
+      .then(async ({ default: Module }) => { const w = await Module(); w.setup(); return w; });
+  }
+  return manifoldLib;
+}
+
+// Union closed bodies (arrays of xyz triangle-soup positions) into one solid with the manifold library.
+async function unionBodies(bodies) {
+  const { Manifold, Mesh } = await loadManifold();
+  const solids = bodies.map((soup) => {
+    const idx = new Map(), verts = [], tris = [];
+    for (let i = 0; i < soup.length; i += 3) {
+      const k = `${soup[i].toFixed(4)},${soup[i + 1].toFixed(4)},${soup[i + 2].toFixed(4)}`;
+      if (!idx.has(k)) { idx.set(k, verts.length / 3); verts.push(soup[i], soup[i + 1], soup[i + 2]); }
+      tris.push(idx.get(k));
+    }
+    const mesh = new Mesh({ numProp: 3, vertProperties: new Float32Array(verts), triVerts: new Uint32Array(tris) });
+    mesh.merge();
+    return new Manifold(mesh);
+  });
+  const m = Manifold.union(solids).getMesh();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(m.vertProperties.filter((_, i) => i % m.numProp < 3)), 3));
+  g.setIndex(new THREE.BufferAttribute(new Uint32Array(m.triVerts), 1));
+  return g.toNonIndexed();
+}
+
+async function downloadFittedSTL() {
+  const btn = $('#download');
+  btn.disabled = true;
+  btn.textContent = 'Preparing…';
   const geom = product.exo.geom.clone();
   product.exo.deformInto(geom, state.dims, true); // keep the STL's original orientation
-  const out = new THREE.Group();
-  out.add(new THREE.Mesh(geom));
+  // split back into the plate and the cradle, plus the hanging hook if it was chosen
+  const pos = geom.attributes.position.array, mask = product.exo.cradleMask, plate = [], cradle = [];
+  for (let v = 0; v < mask.length; v++) (mask[v] ? cradle : plate).push(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]);
+  const bodies = [plate, cradle];
   if (state.upgrades.has('hang')) {
-    const hook = new THREE.Mesh(hookGeometry);
-    hook.position.set(product.exo.mapX(EXO.hookAt[0], product.exo.knots(state.dims)) - 0.3, EXO.plateBottom, EXO.hookAt[1]);
-    out.add(hook);
+    const hook = hookGeometry.clone().translate(product.exo.mapX(EXO.hookAt[0], product.exo.knots(state.dims)) - 0.3, EXO.plateBottom, EXO.hookAt[1]);
+    bodies.push(Array.from(hook.attributes.position.array));
+    hook.dispose();
   }
-  out.updateMatrixWorld(true);
-  const data = new STLExporter().parse(out, { binary: true });
+  let solid;
+  try {
+    solid = await unionBodies(bodies);
+  } catch (err) {
+    // Without the library, keep the overlapping bodies: slicers merge them when printing.
+    console.warn('Could not merge the parts into one solid:', err);
+    solid = new THREE.BufferGeometry();
+    solid.setAttribute('position', new THREE.Float32BufferAttribute(bodies.flat(), 3));
+  }
+  const data = new STLExporter().parse(new THREE.Mesh(solid), { binary: true });
   geom.dispose();
+  solid.dispose();
+  btn.disabled = false;
+  btn.textContent = 'Download fitted STL';
   const url = URL.createObjectURL(new Blob([data], { type: 'model/stl' }));
   const a = document.createElement('a');
   a.href = url;
