@@ -2,7 +2,7 @@
 
 An animated 3D configurator for two kinds of order:
 
-- **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV5.STL` reshapes live to fit the brush head. It starts on its own; a printed handle that pins onto its end is one of the upgrades.
+- **Upgrade my brush.** The customer enters their brush's measurements. The imported `ExoSkeletonV6.STL` reshapes live to fit the brush head. It starts on its own; a printed handle that pins onto its end is one of the upgrades.
 - **Design a new one.** The customer picks a design (paddle, oval, round or slim), a size, bristles, upgrades and a colour.
 
 ## Run it
@@ -28,15 +28,15 @@ Everything you're likely to change is at the top of `app.js`:
 - `CONFIG.exo`: where the exoskeleton touches the brush, in mm in the STL's own axes: the inner faces of the top hook and the side hooks, the gap under the hook lips, and the handle joint. The reference brush size is worked out from these. If you change the STL in CAD, update these so the fitting and the preview line up.
 - `COLORS`, `DESIGNS`, `BRISTLES`, `UPGRADES`: the options people can pick.
 
-To swap in a new STL, replace `ExoSkeletonV5.STL` or change `CONFIG.stlPath`.
+To swap in a new STL, replace `ExoSkeletonV6.STL` or change `CONFIG.stlPath`.
 
 ### Model files
 
-Earlier versions (the original CAD export and V2–V4) were removed from the folder but are still in the git history.
+Earlier versions (the original CAD export and V2–V5) were removed from the folder but are still in the git history.
 
-- `ExoSkeletonV5.STL`: the exoskeleton, slimmed down from the original CAD export (3.2 mm body, 6 mm cross-arms, one centred top hook). Its 30 mm wide end has a square socket. The socket is 5 × 5 mm and 10 mm deep, centred in the 30 mm end face, and a Ø3.0 mm hole crosses it from side to side.
-- `Handle.STL`: a flat handle, 30 mm wide at the joint and 7.62 mm thick, tapering to 26 mm with a rounded tip, 110 mm long. A 4.8 × 4.8 × 9.8 mm square tenon sticks out of its joint face and slots into the socket (0.1 mm clearance per side), with the same Ø3.0 mm cross hole.
-- `Pin.STL`: a Ø2.8 × 30 mm locking pin with chamfered ends. It goes through the block and the tenon from the side and sits flush with both sides.
+- `ExoSkeletonV6.STL`: the exoskeleton, slimmed down from the original CAD export (3.2 mm body, 6 mm cross-arms, one centred top hook). Its end is rounded off into a half circle 30 mm across, with a square socket in it. The socket is 5 × 5 mm and 10 mm deep, centred at the tip of the curve, and a Ø3.0 mm hole crosses it from side to side.
+- `Handle.STL`: a flat handle, 30 mm wide at the joint and 7.62 mm thick, tapering to 26 mm with a rounded tip, 110 mm long. Its joint end is a matching curved cup (0.1 mm clearance) that wraps around the rounded end. A 4.8 × 4.8 × 9.8 mm square tenon sticks out of the middle of the cup and slots into the socket (0.1 mm clearance per side), with the same Ø3.0 mm cross hole.
+- `Pin.STL`: a Ø2.8 × 30 mm locking pin with chamfered ends. It goes in from the side through the handle cup, the exoskeleton end and the tenon, and sits flush with both sides.
 - `HangingHook.STL`: the small 2D hook from the original design, as a separate part. It's the **Hanging hook** upgrade, and it's added to the fitted STL when chosen.
 
 ## How fitting works

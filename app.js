@@ -10,8 +10,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
    CONFIG — edit these to match your model and pricing
    ===================================================================== */
 const CONFIG = {
-  modelVersion: '5.1',         // bump after changing any STL so browsers don't reuse an old cached copy
-  stlPath: 'ExoSkeletonV5.STL',
+  modelVersion: '6',         // bump after changing any STL so browsers don't reuse an old cached copy
+  stlPath: 'ExoSkeletonV6.STL',
   handlePath: 'Handle.STL',    // printed handle that pins onto the end of the exoskeleton
   pinPath: 'Pin.STL',          // locking pin across the joint (the handle's square tenon sits in the exo's square socket)
   hookPath: 'HangingHook.STL', // the optional hanging hook (an upgrade), in its own frame
@@ -25,7 +25,7 @@ const CONFIG = {
     topHookX: 69.29,        // the top hook starts here
     armX: [-18.98, -12.98], // the cross-arms carrying the side hooks
     baseX: -60.71,          // the 30 mm wide end face where the handle pins on: the base of the head
-    jointBlock: 14,         // solid block behind that face holding the square socket (kept rigid)
+    jointBlock: 15,         // the rounded end (a half circle 30 mm across) with the square socket, kept rigid
     sideHookZ: 44.46,       // inner face of each side hook: half the head width
     sideLipZ: 39.38,        // beyond this |z| the side hooks keep their shape
     plateHalfWidth: 15,     // half-width of the back plate
